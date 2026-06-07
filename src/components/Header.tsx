@@ -1,4 +1,4 @@
-import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
 
@@ -10,6 +10,7 @@ interface HeaderProps {
   onOpenGenerator: () => void;
   onOpenPhotography: () => void;
   onOpenExport: () => void;
+  onOpenImport: () => void;
   onBackToMain: () => void;
 }
 
@@ -21,6 +22,7 @@ export function Header({
   onOpenGenerator,
   onOpenPhotography,
   onOpenExport,
+  onOpenImport,
   onBackToMain,
 }: HeaderProps) {
   return (
@@ -71,6 +73,14 @@ export function Header({
                 >
                   <Hash className="w-4 h-4" />
                   <span className="hidden sm:inline">编号生成</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenImport}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Upload className="w-4 h-4" />
+                  <span className="hidden sm:inline">导入数据</span>
                 </button>
                 <button
                   type="button"

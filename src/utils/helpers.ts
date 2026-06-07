@@ -1,3 +1,14 @@
+import type { 
+  CsvFieldMapping, 
+  CsvRowData, 
+  ValidationError, 
+  ValidationErrorType,
+  ImportPreviewData,
+  ImportPreviewRow,
+  SpecimenFormData,
+} from '../types';
+import type { Box, Specimen } from '../types';
+
 export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 };
@@ -76,4 +87,329 @@ export const downloadCsv = (csvContent: string, filename: string): void => {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
+};
+
+const FIELD_NAME_PATTERNS: Record<keyof CsvRowData | 'boxName', string[]> = {
+  specimenNo: ['标本编号', '编号', 'specimenNo', 'specimen_no', 'id', 'no'],
+  species: ['物种名', '物种', '学名', 'species', 'name'],
+  collectionLocation: ['采集地点', '采集地', '地点', 'location', 'collectionLocation', 'place'],
+  collectionDate: ['采集日期', '日期', 'date', 'collectionDate'],
+  pinnedStatus: ['针插状态', '针插', 'pinned', 'pinnedStatus'],
+  photographed: ['拍照状态', '拍照', '已拍照', 'photographed', 'photo'],
+  boxName: ['展盒名称', '展盒', 'box', 'boxName', 'box_name'],
+  notes: ['备注', '说明', 'notes', 'remark', 'description'],
+  batchId: ['批次', '批次号', 'batch', 'batchId', '采集批次'],
+};
+
+export const autoDetectFieldMapping = (headers: string[]): CsvFieldMapping => {
+  const mapping: CsvFieldMapping = {};
+  
+  headers.forEach((header) => {
+    const normalizedHeader = header.trim().toLowerCase();
+    let matchedField: keyof CsvRowData | 'boxName' | null = null;
+
+    for (const [field, patterns] of Object.entries(FIELD_NAME_PATTERNS)) {
+      const isMatch = patterns.some((pattern) => 
+        normalizedHeader === pattern.toLowerCase() ||
+        normalizedHeader.includes(pattern.toLowerCase())
+      );
+      
+      if (isMatch) {
+        matchedField = field as keyof CsvRowData | 'boxName';
+        break;
+      }
+    }
+
+    mapping[header] = matchedField;
+  });
+
+  return mapping;
+};
+
+export const parseCsv = (content: string): string[][] => {
+  const cleanContent = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentField = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < cleanContent.length; i++) {
+    const char = cleanContent[i];
+    const nextChar = cleanContent[i + 1];
+
+    if (inQuotes) {
+      if (char === '"' && nextChar === '"') {
+        currentField += '"';
+        i++;
+      } else if (char === '"') {
+        inQuotes = false;
+      } else {
+        currentField += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        currentRow.push(currentField.trim());
+        currentField = '';
+      } else if (char === '\n') {
+        currentRow.push(currentField.trim());
+        rows.push(currentRow);
+        currentRow = [];
+        currentField = '';
+      } else {
+        currentField += char;
+      }
+    }
+  }
+
+  if (currentField.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentField.trim());
+    rows.push(currentRow);
+  }
+
+  return rows.filter(row => row.some(cell => cell.trim() !== ''));
+};
+
+const parseBooleanValue = (value: string): boolean | null => {
+  const normalized = value.trim().toLowerCase();
+  if (['已针插', '是', 'true', '1', 'yes', '已拍照', 'y'].includes(normalized)) {
+    return true;
+  }
+  if (['未针插', '否', 'false', '0', 'no', '未拍照', 'n', ''].includes(normalized)) {
+    return false;
+  }
+  return null;
+};
+
+const isValidDate = (dateString: string): boolean => {
+  if (!dateString.trim()) return true;
+  const timestamp = Date.parse(dateString);
+  return !isNaN(timestamp);
+};
+
+const normalizeDate = (dateString: string): string => {
+  if (!dateString.trim()) return '';
+  const date = new Date(dateString);
+  return date.toISOString().split('T')[0];
+};
+
+const createError = (
+  rowIndex: number,
+  field: string,
+  type: ValidationErrorType,
+  message: string
+): ValidationError => ({
+  rowIndex,
+  field,
+  type,
+  message,
+});
+
+export const validateAndPreviewCsv = (
+  csvContent: string,
+  existingSpecimens: Specimen[],
+  existingBoxes: Box[]
+): ImportPreviewData => {
+  const parsedRows = parseCsv(csvContent);
+  
+  if (parsedRows.length < 1) {
+    throw new Error('CSV文件为空或格式不正确');
+  }
+
+  const headers = parsedRows[0];
+  const dataRows = parsedRows.slice(1);
+  const fieldMapping = autoDetectFieldMapping(headers);
+  
+  const existingSpecimenNos = new Set(existingSpecimens.map(s => s.specimenNo.toLowerCase()));
+  const existingBoxNames = new Set(existingBoxes.map(b => b.name.toLowerCase()));
+  const fileSpecimenNos = new Map<string, number[]>();
+
+  const rows: ImportPreviewRow[] = dataRows.map((rowData, rowIdx) => {
+    const actualRowIndex = rowIdx + 2;
+    const data: Partial<CsvRowData> = {};
+    const errors: ValidationError[] = [];
+    const warnings: ValidationError[] = [];
+
+    headers.forEach((header, colIdx) => {
+      const field = fieldMapping[header];
+      const value = rowData[colIdx] || '';
+
+      if (field === null) return;
+
+      switch (field) {
+        case 'specimenNo':
+          data.specimenNo = value.trim();
+          if (data.specimenNo) {
+            const lowerNo = data.specimenNo.toLowerCase();
+            if (existingSpecimenNos.has(lowerNo)) {
+              errors.push(createError(
+                actualRowIndex,
+                '标本编号',
+                'duplicate_no',
+                `标本编号 "${data.specimenNo}" 已存在于系统中`
+              ));
+            }
+            if (!fileSpecimenNos.has(lowerNo)) {
+              fileSpecimenNos.set(lowerNo, []);
+            }
+            fileSpecimenNos.get(lowerNo)!.push(actualRowIndex);
+          }
+          break;
+        case 'species':
+          data.species = value.trim();
+          break;
+        case 'collectionLocation':
+          data.collectionLocation = value.trim();
+          break;
+        case 'collectionDate':
+          if (value.trim()) {
+            if (!isValidDate(value)) {
+              errors.push(createError(
+                actualRowIndex,
+                '采集日期',
+                'invalid_date',
+                `日期格式不正确: "${value}"`
+              ));
+            } else {
+              data.collectionDate = normalizeDate(value);
+            }
+          }
+          break;
+        case 'pinnedStatus':
+          const pinnedBool = parseBooleanValue(value);
+          if (pinnedBool === null && value.trim() !== '') {
+            errors.push(createError(
+              actualRowIndex,
+              '针插状态',
+              'invalid_boolean',
+              `针插状态格式不正确: "${value}"，请使用"已针插"/"未针插"或"是"/"否"`
+            ));
+          } else {
+            data.pinnedStatus = pinnedBool ?? false;
+          }
+          break;
+        case 'photographed':
+          const photoBool = parseBooleanValue(value);
+          if (photoBool === null && value.trim() !== '') {
+            errors.push(createError(
+              actualRowIndex,
+              '拍照状态',
+              'invalid_boolean',
+              `拍照状态格式不正确: "${value}"，请使用"已拍照"/"未拍照"或"是"/"否"`
+            ));
+          } else {
+            data.photographed = photoBool ?? false;
+          }
+          break;
+        case 'boxName':
+          data.boxName = value.trim();
+          if (data.boxName && !existingBoxNames.has(data.boxName.toLowerCase())) {
+            errors.push(createError(
+              actualRowIndex,
+              '展盒名称',
+              'box_not_found',
+              `展盒 "${data.boxName}" 不存在，请先创建展盒`
+            ));
+          }
+          break;
+        case 'notes':
+          data.notes = value.trim();
+          break;
+        case 'batchId':
+          data.batchId = value.trim();
+          break;
+      }
+    });
+
+    if (!data.specimenNo) {
+      errors.push(createError(
+        actualRowIndex,
+        '标本编号',
+        'missing_required',
+        '缺少必填项：标本编号'
+      ));
+    }
+    if (!data.species) {
+      errors.push(createError(
+        actualRowIndex,
+        '物种名',
+        'missing_required',
+        '缺少必填项：物种名'
+      ));
+    }
+
+    return {
+      rowIndex: actualRowIndex,
+      data,
+      errors,
+      warnings,
+      isValid: errors.length === 0,
+    };
+  });
+
+  rows.forEach((row) => {
+    if (row.data.specimenNo) {
+      const lowerNo = row.data.specimenNo.toLowerCase();
+      const occurrences = fileSpecimenNos.get(lowerNo) || [];
+      if (occurrences.length > 1) {
+        const otherRows = occurrences.filter(r => r !== row.rowIndex);
+        row.errors.push(createError(
+          row.rowIndex,
+          '标本编号',
+          'duplicate_no_in_file',
+          `标本编号在文件内重复，第 ${otherRows.join('、')} 行也使用了该编号`
+        ));
+        row.isValid = false;
+      }
+    }
+  });
+
+  const validCount = rows.filter(r => r.isValid).length;
+  const invalidCount = rows.filter(r => !r.isValid).length;
+
+  return {
+    headers,
+    fieldMapping,
+    rows,
+    validCount,
+    invalidCount,
+    totalCount: rows.length,
+  };
+};
+
+export const convertToSpecimenFormData = (
+  previewRow: ImportPreviewRow,
+  boxes: Box[]
+): SpecimenFormData | null => {
+  if (!previewRow.isValid || !previewRow.data.specimenNo || !previewRow.data.species) {
+    return null;
+  }
+
+  const { data } = previewRow;
+  const box = data.boxName 
+    ? boxes.find(b => b.name.toLowerCase() === data.boxName!.toLowerCase())
+    : null;
+
+  return {
+    specimenNo: data.specimenNo,
+    species: data.species,
+    collectionLocation: data.collectionLocation || '',
+    collectionDate: data.collectionDate || '',
+    pinnedStatus: data.pinnedStatus ?? false,
+    photographed: data.photographed ?? false,
+    boxId: box?.id || '',
+    batchId: data.batchId || '',
+    notes: data.notes || '',
+  };
+};
+
+export const readFileAsText = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = (e) => reject(e);
+    reader.readAsText(file, 'UTF-8');
+  });
 };
