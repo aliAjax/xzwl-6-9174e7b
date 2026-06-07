@@ -1074,7 +1074,7 @@ export const getSpecimenLabelData = (
   boxes: Box[]
 ): SpecimenLabelData => {
   const box = boxes.find(b => b.id === specimen.boxId);
-  
+
   return {
     specimenNo: specimen.specimenNo,
     species: specimen.species,
@@ -1130,34 +1130,34 @@ export const getPrintStyles = (): string => {
       margin: 5mm;
       size: auto;
     }
-    
+
     @media print {
       body * {
         visibility: hidden;
       }
-      
+
       #label-print-area, #label-print-area * {
         visibility: visible;
       }
-      
+
       #label-print-area {
         position: absolute;
         left: 0;
         top: 0;
         width: 100%;
       }
-      
+
       .label-page {
         page-break-after: always;
         page-break-inside: avoid;
         margin: 0;
         padding: 0;
       }
-      
+
       .label-page:last-child {
         page-break-after: auto;
       }
-      
+
       .label-item {
         page-break-inside: avoid;
       }

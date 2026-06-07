@@ -63,13 +63,13 @@ export function LabelPrintModal({
 
   const filteredSpecimensForPrint = useMemo(() => {
     let result = specimens;
-    
+
     if (boxFilter === '__unassigned__') {
       result = result.filter(s => !s.boxId);
     } else if (boxFilter) {
       result = result.filter(s => s.boxId === boxFilter);
     }
-    
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(s =>
@@ -77,7 +77,7 @@ export function LabelPrintModal({
         s.species.toLowerCase().includes(query)
       );
     }
-    
+
     return result;
   }, [specimens, boxFilter, searchQuery]);
 
@@ -126,7 +126,7 @@ export function LabelPrintModal({
     const styleEl = document.createElement('style');
     styleEl.innerHTML = getPrintStyles();
     document.head.appendChild(styleEl);
-    
+
     setTimeout(() => {
       window.print();
       document.head.removeChild(styleEl);
@@ -177,20 +177,27 @@ export function LabelPrintModal({
       return (
         <div
           key={index}
-          className={`label-item flex flex-col justify-center items-center p-1 bg-white border border-black/30 ${FONT_SIZE_CLASSES[settings.fontSize]}`}
+          className={`label-item flex flex-col justify-between p-1 bg-white border border-black/30 ${FONT_SIZE_CLASSES[settings.fontSize]}`}
           style={{
             width: `${template.width}mm`,
             height: `${template.height}mm`,
           }}
         >
+          <div className="flex justify-between items-center">
+            <span className="font-mono font-bold">{labelData.specimenNo}</span>
+            <span className={`px-0.5 rounded text-[6px] ${labelData.photographed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {labelData.photographed ? '已拍' : '未拍'}
+            </span>
+          </div>
           <div className="font-bold font-serif text-center leading-tight">
             {labelData.species}
           </div>
-          <div className="font-mono text-center">
-            {labelData.specimenNo}
-          </div>
-          <div className="text-center truncate w-full">
+          <div className="text-[7px] text-center truncate">
             {labelData.collectionLocation}
+          </div>
+          <div className="flex justify-between text-[6px]">
+            <span>{formatDate(labelData.collectionDate)}</span>
+            <span className="truncate max-w-[50%]">{labelData.boxLocation || '-'}</span>
           </div>
         </div>
       );
@@ -471,14 +478,21 @@ export function LabelPrintModal({
                         <div className="flex items-start gap-3">
                           <div
                             className={`flex-shrink-0 border border-black/30 bg-white ${
-                              type === 'pin' ? 'w-24 h-12' : 'w-32 h-20'
+                              type === 'pin' ? 'w-28 h-20' : 'w-32 h-20'
                             }`}
                           >
                             {type === 'pin' ? (
-                              <div className="w-full h-full flex flex-col items-center justify-center text-[8px] p-0.5">
+                              <div className="w-full h-full flex flex-col justify-between p-1 text-[7px]">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-mono font-bold">NO.001</span>
+                                  <span className="px-0.5 bg-green-100 text-green-700 rounded text-[5px]">已拍</span>
+                                </div>
                                 <div className="font-bold text-center">物种名</div>
-                                <div className="font-mono text-center">NO.001</div>
-                                <div className="text-center">采集地</div>
+                                <div className="text-center truncate">采集地点</div>
+                                <div className="flex justify-between text-[6px]">
+                                  <span>2024-01-15</span>
+                                  <span>位置A</span>
+                                </div>
                               </div>
                             ) : (
                               <div className="w-full h-full flex flex-col p-1 text-[8px]">
@@ -614,7 +628,7 @@ export function LabelPrintModal({
                   共 {labelPages.length} 页，{labelDataList.length} 个标签
                 </div>
               </div>
-              
+
               {labelPages.map((page, pageIndex) => (
                 <div
                   key={pageIndex}

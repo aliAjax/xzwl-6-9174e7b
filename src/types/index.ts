@@ -173,7 +173,7 @@ export type LabelTemplateType = 'pin' | 'box';
 export type PaperSizeType = 'A4' | 'A5';
 
 export interface LabelField {
-  key: keyof SpecimenLabelData | 'boxLocation';
+  key: keyof SpecimenLabelData;
   label: string;
   required: boolean;
 }
@@ -226,11 +226,11 @@ export const LABEL_TEMPLATES: Record<LabelTemplateType, {
 }> = {
   pin: {
     label: '针插标本标签',
-    description: '适用于针插标本的小尺寸标签，通常尺寸约 30mm × 15mm',
-    width: 30,
-    height: 15,
-    perRow: { A4: 6, A5: 4 },
-    perPage: { A4: 96, A5: 48 },
+    description: '适用于针插标本的小尺寸标签，尺寸约 35mm × 25mm',
+    width: 35,
+    height: 25,
+    perRow: { A4: 5, A5: 3 },
+    perPage: { A4: 60, A5: 27 },
   },
   box: {
     label: '展盒贴纸标签',
