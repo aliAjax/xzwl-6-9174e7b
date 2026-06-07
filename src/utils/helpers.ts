@@ -89,17 +89,61 @@ export const downloadCsv = (csvContent: string, filename: string): void => {
   URL.revokeObjectURL(url);
 };
 
-const FIELD_NAME_PATTERNS: Record<keyof CsvRowData | 'boxName', string[]> = {
-  specimenNo: ['标本编号', '编号', 'specimenNo', 'specimen_no', 'id', 'no'],
-  species: ['物种名', '物种', '学名', 'species', 'name'],
-  collectionLocation: ['采集地点', '采集地', '地点', 'location', 'collectionLocation', 'place'],
-  collectionDate: ['采集日期', '日期', 'date', 'collectionDate'],
-  pinnedStatus: ['针插状态', '针插', 'pinned', 'pinnedStatus'],
-  photographed: ['拍照状态', '拍照', '已拍照', 'photographed', 'photo'],
-  boxName: ['展盒名称', '展盒', 'box', 'boxName', 'box_name'],
-  notes: ['备注', '说明', 'notes', 'remark', 'description'],
-  batchId: ['批次', '批次号', 'batch', 'batchId', '采集批次'],
+interface FieldPattern {
+  exact: string[];
+  contains: string[];
+}
+
+const FIELD_NAME_PATTERNS: Record<keyof CsvRowData | 'boxName', FieldPattern> = {
+  specimenNo: {
+    exact: ['标本编号', '编号', 'specimenno', 'specimen_no', 'specimenno', 'id', 'no'],
+    contains: ['标本编号', 'specimenno', 'specimen_no'],
+  },
+  species: {
+    exact: ['物种名', '物种', '学名', 'species', 'name'],
+    contains: ['物种名', '物种', '学名', 'species'],
+  },
+  collectionLocation: {
+    exact: ['采集地点', '采集地', '地点', 'collectionlocation', 'collection_location', 'location', 'place'],
+    contains: ['采集地点', '采集地', 'collectionlocation', 'collection_location'],
+  },
+  collectionDate: {
+    exact: ['采集日期', '日期', 'collectiondate', 'collection_date', 'date'],
+    contains: ['采集日期', 'collectiondate', 'collection_date'],
+  },
+  pinnedStatus: {
+    exact: ['针插状态', '针插', 'pinnedstatus', 'pinned_status', 'pinned'],
+    contains: ['针插状态', '针插', 'pinnedstatus', 'pinned'],
+  },
+  photographed: {
+    exact: ['拍照状态', '拍照', '已拍照', 'photographed', 'photo'],
+    contains: ['拍照状态', '拍照', '已拍照', 'photographed'],
+  },
+  boxName: {
+    exact: ['展盒名称', '展盒', 'boxname', 'box_name', 'box'],
+    contains: ['展盒名称', '展盒', 'boxname', 'box_name'],
+  },
+  notes: {
+    exact: ['备注', '说明', 'notes', 'remark', 'description'],
+    contains: ['备注', '说明', 'notes', 'remark', 'description'],
+  },
+  batchId: {
+    exact: ['批次', '批次号', 'batchid', 'batch_id', '采集批次', 'batch'],
+    contains: ['批次', 'batchid', '采集批次', 'batch_id'],
+  },
 };
+
+const MATCH_PRIORITY: (keyof CsvRowData | 'boxName')[] = [
+  'specimenNo',
+  'collectionLocation',
+  'collectionDate',
+  'pinnedStatus',
+  'photographed',
+  'boxName',
+  'batchId',
+  'species',
+  'notes',
+];
 
 export const autoDetectFieldMapping = (headers: string[]): CsvFieldMapping => {
   const mapping: CsvFieldMapping = {};
@@ -108,14 +152,24 @@ export const autoDetectFieldMapping = (headers: string[]): CsvFieldMapping => {
     const normalizedHeader = header.trim().toLowerCase();
     let matchedField: keyof CsvRowData | 'boxName' | null = null;
 
-    for (const [field, patterns] of Object.entries(FIELD_NAME_PATTERNS)) {
-      const isMatch = patterns.some((pattern) => 
-        normalizedHeader === pattern.toLowerCase() ||
+    for (const field of MATCH_PRIORITY) {
+      const patterns = FIELD_NAME_PATTERNS[field];
+      
+      const exactMatch = patterns.exact.some((pattern) => 
+        normalizedHeader === pattern.toLowerCase()
+      );
+      
+      if (exactMatch) {
+        matchedField = field;
+        break;
+      }
+      
+      const containsMatch = patterns.contains.some((pattern) => 
         normalizedHeader.includes(pattern.toLowerCase())
       );
       
-      if (isMatch) {
-        matchedField = field as keyof CsvRowData | 'boxName';
+      if (containsMatch) {
+        matchedField = field;
         break;
       }
     }
@@ -277,7 +331,7 @@ export const validateAndPreviewCsv = (
             }
           }
           break;
-        case 'pinnedStatus':
+        case 'pinnedStatus': {
           const pinnedBool = parseBooleanValue(value);
           if (pinnedBool === null && value.trim() !== '') {
             errors.push(createError(
@@ -290,7 +344,8 @@ export const validateAndPreviewCsv = (
             data.pinnedStatus = pinnedBool ?? false;
           }
           break;
-        case 'photographed':
+        }
+        case 'photographed': {
           const photoBool = parseBooleanValue(value);
           if (photoBool === null && value.trim() !== '') {
             errors.push(createError(
@@ -303,6 +358,7 @@ export const validateAndPreviewCsv = (
             data.photographed = photoBool ?? false;
           }
           break;
+        }
         case 'boxName':
           data.boxName = value.trim();
           if (data.boxName && !existingBoxNames.has(data.boxName.toLowerCase())) {
