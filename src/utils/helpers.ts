@@ -526,15 +526,19 @@ export const parseBackupFile = (content: string): BackupFileData => {
   try {
     const data = JSON.parse(content);
     
-    if (!data || typeof data !== 'object') {
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('备份文件格式不正确');
     }
     
-    if (!data.version || !data.data || !data.stats) {
+    if (!('version' in data) || !('data' in data) || !('stats' in data)) {
       throw new Error('备份文件缺少必要字段');
     }
     
-    if (!data.data.boxes || !data.data.specimens || !data.data.batches) {
+    if (!data.data || typeof data.data !== 'object' || Array.isArray(data.data)) {
+      throw new Error('备份文件数据字段格式不正确');
+    }
+    
+    if (!('boxes' in data.data) || !('specimens' in data.data) || !('batches' in data.data)) {
       throw new Error('备份文件数据结构不完整');
     }
     
@@ -543,7 +547,10 @@ export const parseBackupFile = (content: string): BackupFileData => {
     if (e instanceof SyntaxError) {
       throw new Error('JSON解析失败，请确保文件是有效的JSON格式');
     }
-    throw e;
+    if (e instanceof Error) {
+      throw e;
+    }
+    throw new Error('解析备份文件时发生未知错误');
   }
 };
 
@@ -571,6 +578,16 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
   
   if (!Array.isArray(backupData.data.batches)) {
     errors.push('备份文件中的批次数据格式不正确');
+  }
+  
+  if (errors.length > 0) {
+    return {
+      isValid: false,
+      errors,
+      warnings,
+      versionMatch,
+      canRestore: false,
+    };
   }
   
   const requiredBoxFields = ['id', 'name'];
@@ -607,6 +624,24 @@ export const analyzeConflicts = (
   currentSpecimens: Specimen[],
   currentBatches: CollectionBatch[]
 ): RestorePreviewData['conflicts'] => {
+  const emptyConflicts: RestorePreviewData['conflicts'] = {
+    boxIdConflicts: [],
+    specimenIdConflicts: [],
+    batchIdConflicts: [],
+    specimenNoConflicts: [],
+    missingBoxReferences: [],
+    missingBatchReferences: [],
+  };
+
+  if (
+    !backupData?.data ||
+    !Array.isArray(backupData.data.boxes) ||
+    !Array.isArray(backupData.data.specimens) ||
+    !Array.isArray(backupData.data.batches)
+  ) {
+    return emptyConflicts;
+  }
+
   const currentBoxIds = new Set(currentBoxes.map(b => b.id));
   const currentSpecimenIds = new Set(currentSpecimens.map(s => s.id));
   const currentBatchIds = new Set(currentBatches.map(b => b.id));
@@ -657,17 +692,23 @@ export const generateIdMappingPlan = (
   const specimenIdMap: Record<string, string> = {};
   const batchIdMap: Record<string, string> = {};
   
-  conflicts.boxIdConflicts.forEach(oldId => {
-    boxIdMap[oldId] = generateId();
-  });
+  if (conflicts?.boxIdConflicts && Array.isArray(conflicts.boxIdConflicts)) {
+    conflicts.boxIdConflicts.forEach(oldId => {
+      boxIdMap[oldId] = generateId();
+    });
+  }
   
-  conflicts.specimenIdConflicts.forEach(oldId => {
-    specimenIdMap[oldId] = generateId();
-  });
+  if (conflicts?.specimenIdConflicts && Array.isArray(conflicts.specimenIdConflicts)) {
+    conflicts.specimenIdConflicts.forEach(oldId => {
+      specimenIdMap[oldId] = generateId();
+    });
+  }
   
-  conflicts.batchIdConflicts.forEach(oldId => {
-    batchIdMap[oldId] = generateId();
-  });
+  if (conflicts?.batchIdConflicts && Array.isArray(conflicts.batchIdConflicts)) {
+    conflicts.batchIdConflicts.forEach(oldId => {
+      batchIdMap[oldId] = generateId();
+    });
+  }
   
   return {
     boxIdMap,
@@ -683,6 +724,36 @@ export const generateRestorePreview = (
   currentBatches: CollectionBatch[]
 ): RestorePreviewData => {
   const compatibility = checkCompatibility(backupData);
+  
+  const emptyConflicts: RestorePreviewData['conflicts'] = {
+    boxIdConflicts: [],
+    specimenIdConflicts: [],
+    batchIdConflicts: [],
+    specimenNoConflicts: [],
+    missingBoxReferences: [],
+    missingBatchReferences: [],
+  };
+  
+  const emptyIdMappingPlan: RestorePreviewData['idMappingPlan'] = {
+    boxIdMap: {},
+    specimenIdMap: {},
+    batchIdMap: {},
+  };
+  
+  if (!compatibility.canRestore) {
+    return {
+      backupData,
+      compatibility,
+      currentStats: {
+        boxCount: currentBoxes.length,
+        specimenCount: currentSpecimens.length,
+        batchCount: currentBatches.length,
+      },
+      conflicts: emptyConflicts,
+      idMappingPlan: emptyIdMappingPlan,
+    };
+  }
+  
   const conflicts = analyzeConflicts(backupData, currentBoxes, currentSpecimens, currentBatches);
   const idMappingPlan = generateIdMappingPlan(backupData, conflicts);
   
@@ -703,30 +774,36 @@ export const remapIds = (
   backupData: BackupFileData,
   idMappingPlan: RestorePreviewData['idMappingPlan']
 ): BackupFileData => {
-  const { boxIdMap, specimenIdMap, batchIdMap } = idMappingPlan;
+  const { boxIdMap = {}, specimenIdMap = {}, batchIdMap = {} } = idMappingPlan || {};
   
-  const remappedBoxes = backupData.data.boxes.map(box => ({
-    ...box,
-    id: boxIdMap[box.id] || box.id,
-  }));
+  const remappedBoxes = Array.isArray(backupData.data.boxes)
+    ? backupData.data.boxes.map(box => ({
+        ...box,
+        id: boxIdMap[box.id] || box.id,
+      }))
+    : [];
   
-  const remappedBatches = backupData.data.batches.map(batch => ({
-    ...batch,
-    id: batchIdMap[batch.id] || batch.id,
-  }));
+  const remappedBatches = Array.isArray(backupData.data.batches)
+    ? backupData.data.batches.map(batch => ({
+        ...batch,
+        id: batchIdMap[batch.id] || batch.id,
+      }))
+    : [];
   
-  const remappedSpecimens = backupData.data.specimens.map(specimen => {
-    const newSpecimenId = specimenIdMap[specimen.id] || specimen.id;
-    const newBoxId = specimen.boxId ? (boxIdMap[specimen.boxId] || specimen.boxId) : '';
-    const newBatchId = specimen.batchId ? (batchIdMap[specimen.batchId] || specimen.batchId) : '';
-    
-    return {
-      ...specimen,
-      id: newSpecimenId,
-      boxId: newBoxId,
-      batchId: newBatchId,
-    };
-  });
+  const remappedSpecimens = Array.isArray(backupData.data.specimens)
+    ? backupData.data.specimens.map(specimen => {
+        const newSpecimenId = specimenIdMap[specimen.id] || specimen.id;
+        const newBoxId = specimen.boxId ? (boxIdMap[specimen.boxId] || specimen.boxId) : '';
+        const newBatchId = specimen.batchId ? (batchIdMap[specimen.batchId] || specimen.batchId) : '';
+        
+        return {
+          ...specimen,
+          id: newSpecimenId,
+          boxId: newBoxId,
+          batchId: newBatchId,
+        };
+      })
+    : [];
   
   return {
     ...backupData,
@@ -742,30 +819,40 @@ export const handleSpecimenNoDuplicates = (
   backupData: BackupFileData,
   currentSpecimens: Specimen[]
 ): { data: BackupFileData; remappedNos: string[] } => {
-  const currentNos = new Set(currentSpecimens.map(s => s.specimenNo.toLowerCase()));
+  const currentNos = new Set(
+    currentSpecimens
+      .filter(s => s.specimenNo)
+      .map(s => s.specimenNo.toLowerCase())
+  );
   const remappedNos: string[] = [];
   
-  const remappedSpecimens = backupData.data.specimens.map(specimen => {
-    if (currentNos.has(specimen.specimenNo.toLowerCase())) {
-      const baseNo = specimen.specimenNo;
-      let suffix = 1;
-      let newNo = `${baseNo}_备份${suffix}`;
-      
-      while (currentNos.has(newNo.toLowerCase())) {
-        suffix++;
-        newNo = `${baseNo}_备份${suffix}`;
-      }
-      
-      currentNos.add(newNo.toLowerCase());
-      remappedNos.push(`${baseNo} → ${newNo}`);
-      
-      return {
-        ...specimen,
-        specimenNo: newNo,
-      };
-    }
-    return specimen;
-  });
+  const remappedSpecimens = Array.isArray(backupData.data.specimens)
+    ? backupData.data.specimens.map(specimen => {
+        if (!specimen.specimenNo) {
+          return specimen;
+        }
+        
+        if (currentNos.has(specimen.specimenNo.toLowerCase())) {
+          const baseNo = specimen.specimenNo;
+          let suffix = 1;
+          let newNo = `${baseNo}_备份${suffix}`;
+          
+          while (currentNos.has(newNo.toLowerCase())) {
+            suffix++;
+            newNo = `${baseNo}_备份${suffix}`;
+          }
+          
+          currentNos.add(newNo.toLowerCase());
+          remappedNos.push(`${baseNo} → ${newNo}`);
+          
+          return {
+            ...specimen,
+            specimenNo: newNo,
+          };
+        }
+        return specimen;
+      })
+    : [];
   
   return {
     data: {
@@ -787,9 +874,18 @@ export const filterSpecimensWithValidReferences = (
   const valid: Specimen[] = [];
   const invalid: Specimen[] = [];
   
+  if (!Array.isArray(specimens)) {
+    return { valid, invalid };
+  }
+  
+  const safeValidBoxIds = validBoxIds || new Set();
+  const safeValidBatchIds = validBatchIds || new Set();
+  
   specimens.forEach(specimen => {
-    const boxValid = !specimen.boxId || validBoxIds.has(specimen.boxId);
-    const batchValid = !specimen.batchId || validBatchIds.has(specimen.batchId);
+    if (!specimen) return;
+    
+    const boxValid = !specimen.boxId || safeValidBoxIds.has(specimen.boxId);
+    const batchValid = !specimen.batchId || safeValidBatchIds.has(specimen.batchId);
     
     if (boxValid && batchValid) {
       valid.push(specimen);
@@ -858,19 +954,18 @@ export const performRestore = (
     }
     
     if (options.importSpecimens) {
-      const allBoxIds = new Set([
-        ...currentBoxes.map(b => b.id),
-        ...processedData.data.boxes.map(b => b.id),
-      ]);
-      const allBatchIds = new Set([
-        ...currentBatches.map(b => b.id),
-        ...processedData.data.batches.map(b => b.id),
-      ]);
+      const validBoxIds = options.importBoxes
+        ? new Set(processedData.data.boxes.map(b => b.id))
+        : new Set(currentBoxes.map(b => b.id));
+      
+      const validBatchIds = options.importBatches
+        ? new Set(processedData.data.batches.map(b => b.id))
+        : new Set(currentBatches.map(b => b.id));
       
       const { valid, invalid } = filterSpecimensWithValidReferences(
         processedData.data.specimens,
-        options.importBoxes ? new Set(processedData.data.boxes.map(b => b.id)) : allBoxIds,
-        options.importBatches ? new Set(processedData.data.batches.map(b => b.id)) : allBatchIds
+        validBoxIds,
+        validBatchIds
       );
       
       setSpecimens(valid);
@@ -923,19 +1018,20 @@ export const performRestore = (
     }
     
     if (options.importSpecimens) {
-      const allBoxIds = new Set([
-        ...currentBoxes.map(b => b.id),
-        ...processedData.data.boxes.map(b => b.id),
-      ]);
-      const allBatchIds = new Set([
-        ...currentBatches.map(b => b.id),
-        ...processedData.data.batches.map(b => b.id),
-      ]);
+      const validBoxIds = new Set(currentBoxes.map(b => b.id));
+      if (options.importBoxes) {
+        processedData.data.boxes.forEach(b => validBoxIds.add(b.id));
+      }
+      
+      const validBatchIds = new Set(currentBatches.map(b => b.id));
+      if (options.importBatches) {
+        processedData.data.batches.forEach(b => validBatchIds.add(b.id));
+      }
       
       const { valid, invalid } = filterSpecimensWithValidReferences(
         processedData.data.specimens,
-        allBoxIds,
-        allBatchIds
+        validBoxIds,
+        validBatchIds
       );
       
       const currentSpecimenMap = new Map(currentSpecimens.map(s => [s.id, s]));
