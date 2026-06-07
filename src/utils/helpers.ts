@@ -1,7 +1,7 @@
-import type { 
-  CsvFieldMapping, 
-  CsvRowData, 
-  ValidationError, 
+import type {
+  CsvFieldMapping,
+  CsvRowData,
+  ValidationError,
   ValidationErrorType,
   ImportPreviewData,
   ImportPreviewRow,
@@ -187,7 +187,7 @@ export const autoDetectFieldMapping = (headers: string[]): CsvFieldMapping => {
 
 export const parseCsv = (content: string): string[][] => {
   const cleanContent = content.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-  
+
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentField = '';
@@ -272,7 +272,7 @@ export const validateAndPreviewCsv = (
   existingBoxes: Box[]
 ): ImportPreviewData => {
   const parsedRows = parseCsv(csvContent);
-  
+
   if (parsedRows.length < 1) {
     throw new Error('CSV文件为空或格式不正确');
   }
@@ -280,7 +280,7 @@ export const validateAndPreviewCsv = (
   const headers = parsedRows[0];
   const dataRows = parsedRows.slice(1);
   const fieldMapping = autoDetectFieldMapping(headers);
-  
+
   const existingSpecimenNos = new Set(existingSpecimens.map(s => s.specimenNo.toLowerCase()));
   const existingBoxNames = new Set(existingBoxes.map(b => b.name.toLowerCase()));
   const fileSpecimenNos = new Map<string, number[]>();
@@ -449,7 +449,7 @@ export const convertToSpecimenFormData = (
   }
 
   const { data } = previewRow;
-  const box = data.boxName 
+  const box = data.boxName
     ? boxes.find(b => b.name.toLowerCase() === data.boxName!.toLowerCase())
     : null;
 
@@ -525,23 +525,23 @@ export const exportBackup = (
 export const parseBackupFile = (content: string): BackupFileData => {
   try {
     const data = JSON.parse(content);
-    
+
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
       throw new Error('备份文件格式不正确');
     }
-    
+
     if (!('version' in data) || !('data' in data) || !('stats' in data)) {
       throw new Error('备份文件缺少必要字段');
     }
-    
+
     if (!data.data || typeof data.data !== 'object' || Array.isArray(data.data)) {
       throw new Error('备份文件数据字段格式不正确');
     }
-    
+
     if (!('boxes' in data.data) || !('specimens' in data.data) || !('batches' in data.data)) {
       throw new Error('备份文件数据结构不完整');
     }
-    
+
     return data as BackupFileData;
   } catch (e) {
     if (e instanceof SyntaxError) {
@@ -559,27 +559,27 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
   const warnings: string[] = [];
   const currentVersion = 1;
   const versionMatch = backupData.version === currentVersion;
-  
+
   if (backupData.version > currentVersion) {
     errors.push(`备份文件版本 (v${backupData.version}) 高于当前系统版本 (v${currentVersion})，请更新系统后再尝试恢复`);
   }
-  
+
   if (backupData.version < currentVersion) {
     warnings.push(`备份文件版本 (v${backupData.version}) 低于当前系统版本 (v${currentVersion})，可能存在兼容性问题`);
   }
-  
+
   if (!Array.isArray(backupData.data.boxes)) {
     errors.push('备份文件中的展盒数据格式不正确');
   }
-  
+
   if (!Array.isArray(backupData.data.specimens)) {
     errors.push('备份文件中的标本数据格式不正确');
   }
-  
+
   if (!Array.isArray(backupData.data.batches)) {
     errors.push('备份文件中的批次数据格式不正确');
   }
-  
+
   if (errors.length > 0) {
     return {
       isValid: false,
@@ -589,7 +589,7 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
       canRestore: false,
     };
   }
-  
+
   const requiredBoxFields = ['id', 'name'];
   backupData.data.boxes.forEach((box, idx) => {
     const missing = requiredBoxFields.filter(f => !(f in box));
@@ -597,7 +597,7 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
       errors.push(`展盒数据第 ${idx + 1} 条缺少必要字段: ${missing.join(', ')}`);
     }
   });
-  
+
   const requiredSpecimenFields = ['id', 'specimenNo', 'species'];
   backupData.data.specimens.forEach((specimen, idx) => {
     const missing = requiredSpecimenFields.filter(f => !(f in specimen));
@@ -605,10 +605,10 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
       errors.push(`标本数据第 ${idx + 1} 条缺少必要字段: ${missing.join(', ')}`);
     }
   });
-  
+
   const isValid = errors.length === 0;
   const canRestore = errors.length === 0;
-  
+
   return {
     isValid,
     errors,
@@ -646,34 +646,34 @@ export const analyzeConflicts = (
   const currentSpecimenIds = new Set(currentSpecimens.map(s => s.id));
   const currentBatchIds = new Set(currentBatches.map(b => b.id));
   const currentSpecimenNos = new Set(currentSpecimens.map(s => s.specimenNo.toLowerCase()));
-  
+
   const boxIdConflicts = backupData.data.boxes
     .filter(b => currentBoxIds.has(b.id))
     .map(b => b.id);
-  
+
   const specimenIdConflicts = backupData.data.specimens
     .filter(s => currentSpecimenIds.has(s.id))
     .map(s => s.id);
-  
+
   const batchIdConflicts = backupData.data.batches
     .filter(b => currentBatchIds.has(b.id))
     .map(b => b.id);
-  
+
   const specimenNoConflicts = backupData.data.specimens
     .filter(s => currentSpecimenNos.has(s.specimenNo.toLowerCase()))
     .map(s => s.specimenNo);
-  
+
   const backupBoxIds = new Set(backupData.data.boxes.map(b => b.id));
   const backupBatchIds = new Set(backupData.data.batches.map(b => b.id));
-  
+
   const missingBoxReferences = backupData.data.specimens
     .filter(s => s.boxId && !backupBoxIds.has(s.boxId) && !currentBoxIds.has(s.boxId))
     .map(s => `${s.specimenNo} (引用展盒ID: ${s.boxId})`);
-  
+
   const missingBatchReferences = backupData.data.specimens
     .filter(s => s.batchId && !backupBatchIds.has(s.batchId) && !currentBatchIds.has(s.batchId))
     .map(s => `${s.specimenNo} (引用批次ID: ${s.batchId})`);
-  
+
   return {
     boxIdConflicts,
     specimenIdConflicts,
@@ -691,25 +691,25 @@ export const generateIdMappingPlan = (
   const boxIdMap: Record<string, string> = {};
   const specimenIdMap: Record<string, string> = {};
   const batchIdMap: Record<string, string> = {};
-  
+
   if (conflicts?.boxIdConflicts && Array.isArray(conflicts.boxIdConflicts)) {
     conflicts.boxIdConflicts.forEach(oldId => {
       boxIdMap[oldId] = generateId();
     });
   }
-  
+
   if (conflicts?.specimenIdConflicts && Array.isArray(conflicts.specimenIdConflicts)) {
     conflicts.specimenIdConflicts.forEach(oldId => {
       specimenIdMap[oldId] = generateId();
     });
   }
-  
+
   if (conflicts?.batchIdConflicts && Array.isArray(conflicts.batchIdConflicts)) {
     conflicts.batchIdConflicts.forEach(oldId => {
       batchIdMap[oldId] = generateId();
     });
   }
-  
+
   return {
     boxIdMap,
     specimenIdMap,
@@ -724,7 +724,7 @@ export const generateRestorePreview = (
   currentBatches: CollectionBatch[]
 ): RestorePreviewData => {
   const compatibility = checkCompatibility(backupData);
-  
+
   const emptyConflicts: RestorePreviewData['conflicts'] = {
     boxIdConflicts: [],
     specimenIdConflicts: [],
@@ -733,13 +733,13 @@ export const generateRestorePreview = (
     missingBoxReferences: [],
     missingBatchReferences: [],
   };
-  
+
   const emptyIdMappingPlan: RestorePreviewData['idMappingPlan'] = {
     boxIdMap: {},
     specimenIdMap: {},
     batchIdMap: {},
   };
-  
+
   if (!compatibility.canRestore) {
     return {
       backupData,
@@ -753,10 +753,10 @@ export const generateRestorePreview = (
       idMappingPlan: emptyIdMappingPlan,
     };
   }
-  
+
   const conflicts = analyzeConflicts(backupData, currentBoxes, currentSpecimens, currentBatches);
   const idMappingPlan = generateIdMappingPlan(backupData, conflicts);
-  
+
   return {
     backupData,
     compatibility,
@@ -775,27 +775,27 @@ export const remapIds = (
   idMappingPlan: RestorePreviewData['idMappingPlan']
 ): BackupFileData => {
   const { boxIdMap = {}, specimenIdMap = {}, batchIdMap = {} } = idMappingPlan || {};
-  
+
   const remappedBoxes = Array.isArray(backupData.data.boxes)
     ? backupData.data.boxes.map(box => ({
         ...box,
         id: boxIdMap[box.id] || box.id,
       }))
     : [];
-  
+
   const remappedBatches = Array.isArray(backupData.data.batches)
     ? backupData.data.batches.map(batch => ({
         ...batch,
         id: batchIdMap[batch.id] || batch.id,
       }))
     : [];
-  
+
   const remappedSpecimens = Array.isArray(backupData.data.specimens)
     ? backupData.data.specimens.map(specimen => {
         const newSpecimenId = specimenIdMap[specimen.id] || specimen.id;
         const newBoxId = specimen.boxId ? (boxIdMap[specimen.boxId] || specimen.boxId) : '';
         const newBatchId = specimen.batchId ? (batchIdMap[specimen.batchId] || specimen.batchId) : '';
-        
+
         return {
           ...specimen,
           id: newSpecimenId,
@@ -804,7 +804,7 @@ export const remapIds = (
         };
       })
     : [];
-  
+
   return {
     ...backupData,
     data: {
@@ -825,26 +825,26 @@ export const handleSpecimenNoDuplicates = (
       .map(s => s.specimenNo.toLowerCase())
   );
   const remappedNos: string[] = [];
-  
+
   const remappedSpecimens = Array.isArray(backupData.data.specimens)
     ? backupData.data.specimens.map(specimen => {
         if (!specimen.specimenNo) {
           return specimen;
         }
-        
+
         if (currentNos.has(specimen.specimenNo.toLowerCase())) {
           const baseNo = specimen.specimenNo;
           let suffix = 1;
           let newNo = `${baseNo}_备份${suffix}`;
-          
+
           while (currentNos.has(newNo.toLowerCase())) {
             suffix++;
             newNo = `${baseNo}_备份${suffix}`;
           }
-          
+
           currentNos.add(newNo.toLowerCase());
           remappedNos.push(`${baseNo} → ${newNo}`);
-          
+
           return {
             ...specimen,
             specimenNo: newNo,
@@ -853,7 +853,7 @@ export const handleSpecimenNoDuplicates = (
         return specimen;
       })
     : [];
-  
+
   return {
     data: {
       ...backupData,
@@ -873,27 +873,27 @@ export const filterSpecimensWithValidReferences = (
 ): { valid: Specimen[]; invalid: Specimen[] } => {
   const valid: Specimen[] = [];
   const invalid: Specimen[] = [];
-  
+
   if (!Array.isArray(specimens)) {
     return { valid, invalid };
   }
-  
+
   const safeValidBoxIds = validBoxIds || new Set();
   const safeValidBatchIds = validBatchIds || new Set();
-  
+
   specimens.forEach(specimen => {
     if (!specimen) return;
-    
+
     const boxValid = !specimen.boxId || safeValidBoxIds.has(specimen.boxId);
     const batchValid = !specimen.batchId || safeValidBatchIds.has(specimen.batchId);
-    
+
     if (boxValid && batchValid) {
       valid.push(specimen);
     } else {
       invalid.push(specimen);
     }
   });
-  
+
   return { valid, invalid };
 };
 
@@ -922,16 +922,16 @@ export const performRestore = (
       },
     };
   }
-  
+
   let processedData = previewData.backupData;
-  
+
   if (options.mode === 'merge') {
     processedData = remapIds(processedData, previewData.idMappingPlan);
-    
+
     const noRemapResult = handleSpecimenNoDuplicates(processedData, currentSpecimens);
     processedData = noRemapResult.data;
   }
-  
+
   const resultStats: RestoreResult['stats'] = {
     boxesAdded: 0,
     boxesUpdated: 0,
@@ -941,50 +941,50 @@ export const performRestore = (
     batchesUpdated: 0,
     skippedDueToMissingRefs: 0,
   };
-  
+
   if (options.mode === 'overwrite') {
     if (options.importBoxes) {
       setBoxes(processedData.data.boxes);
       resultStats.boxesAdded = processedData.data.boxes.length;
     }
-    
+
     if (options.importBatches) {
       setBatches(processedData.data.batches);
       resultStats.batchesAdded = processedData.data.batches.length;
     }
-    
+
     if (options.importSpecimens) {
       const validBoxIds = options.importBoxes
         ? new Set(processedData.data.boxes.map(b => b.id))
         : new Set(currentBoxes.map(b => b.id));
-      
+
       const validBatchIds = options.importBatches
         ? new Set(processedData.data.batches.map(b => b.id))
         : new Set(currentBatches.map(b => b.id));
-      
+
       const { valid, invalid } = filterSpecimensWithValidReferences(
         processedData.data.specimens,
         validBoxIds,
         validBatchIds
       );
-      
+
       setSpecimens(valid);
       resultStats.specimensAdded = valid.length;
       resultStats.skippedDueToMissingRefs = invalid.length;
     }
-    
+
     return {
       success: true,
       message: '数据已覆盖恢复',
       stats: resultStats,
     };
   }
-  
+
   if (options.mode === 'merge') {
     if (options.importBoxes) {
       const currentBoxMap = new Map(currentBoxes.map(b => [b.id, b]));
       const mergedBoxes = [...currentBoxes];
-      
+
       processedData.data.boxes.forEach(box => {
         if (currentBoxMap.has(box.id)) {
           const idx = mergedBoxes.findIndex(b => b.id === box.id);
@@ -995,14 +995,14 @@ export const performRestore = (
           resultStats.boxesAdded++;
         }
       });
-      
+
       setBoxes(mergedBoxes);
     }
-    
+
     if (options.importBatches) {
       const currentBatchMap = new Map(currentBatches.map(b => [b.id, b]));
       const mergedBatches = [...currentBatches];
-      
+
       processedData.data.batches.forEach(batch => {
         if (currentBatchMap.has(batch.id)) {
           const idx = mergedBatches.findIndex(b => b.id === batch.id);
@@ -1013,30 +1013,30 @@ export const performRestore = (
           resultStats.batchesAdded++;
         }
       });
-      
+
       setBatches(mergedBatches);
     }
-    
+
     if (options.importSpecimens) {
       const validBoxIds = new Set(currentBoxes.map(b => b.id));
       if (options.importBoxes) {
         processedData.data.boxes.forEach(b => validBoxIds.add(b.id));
       }
-      
+
       const validBatchIds = new Set(currentBatches.map(b => b.id));
       if (options.importBatches) {
         processedData.data.batches.forEach(b => validBatchIds.add(b.id));
       }
-      
+
       const { valid, invalid } = filterSpecimensWithValidReferences(
         processedData.data.specimens,
         validBoxIds,
         validBatchIds
       );
-      
+
       const currentSpecimenMap = new Map(currentSpecimens.map(s => [s.id, s]));
       const mergedSpecimens = [...currentSpecimens];
-      
+
       valid.forEach(specimen => {
         if (currentSpecimenMap.has(specimen.id)) {
           const idx = mergedSpecimens.findIndex(s => s.id === specimen.id);
@@ -1047,18 +1047,18 @@ export const performRestore = (
           resultStats.specimensAdded++;
         }
       });
-      
+
       setSpecimens(mergedSpecimens);
       resultStats.skippedDueToMissingRefs = invalid.length;
     }
-    
+
     return {
       success: true,
       message: '数据已合并恢复',
       stats: resultStats,
     };
   }
-  
+
   return {
     success: false,
     message: '未知的恢复模式',
