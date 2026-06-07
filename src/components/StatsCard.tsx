@@ -1,0 +1,65 @@
+import { Bug, Camera, Package, Clock } from 'lucide-react';
+
+interface StatsCardProps {
+  stats: {
+    totalSpecimens: number;
+    photographed: number;
+    unphotographed: number;
+    totalBoxes: number;
+  };
+}
+
+export function StatsCard({ stats }: StatsCardProps) {
+  const statItems = [
+    {
+      label: '标本总数',
+      value: stats.totalSpecimens,
+      icon: Bug,
+      color: 'text-oak-700',
+      bgColor: 'bg-oak-100',
+    },
+    {
+      label: '已拍照',
+      value: stats.photographed,
+      icon: Camera,
+      color: 'text-moss-700',
+      bgColor: 'bg-moss-100',
+    },
+    {
+      label: '待拍照',
+      value: stats.unphotographed,
+      icon: Clock,
+      color: 'text-rust-700',
+      bgColor: 'bg-rust-100',
+    },
+    {
+      label: '展盒数量',
+      value: stats.totalBoxes,
+      icon: Package,
+      color: 'text-oak-600',
+      bgColor: 'bg-oak-200',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {statItems.map((item, index) => (
+        <div
+          key={item.label}
+          className="card p-4 flex items-center gap-4 opacity-0 animate-fade-in-up"
+          style={{ animationDelay: `${index * 0.1}s` }}
+        >
+          <div className={`w-12 h-12 rounded-lg ${item.bgColor} flex items-center justify-center flex-shrink-0`}>
+            <item.icon className={`w-6 h-6 ${item.color}`} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-oak-500 text-sm font-sans">{item.label}</p>
+            <p className={`text-2xl font-semibold font-serif ${item.color}`}>
+              {item.value}
+            </p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

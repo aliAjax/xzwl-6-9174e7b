@@ -1,0 +1,240 @@
+import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import type { Box, Specimen, SpecimenFormData } from '../types';
+import { getTodayString } from '../utils/helpers';
+
+interface SpecimenModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSubmit: (data: SpecimenFormData) => void;
+  specimen: Specimen | null;
+  boxes: Box[];
+}
+
+const initialFormData: SpecimenFormData = {
+  specimenNo: '',
+  species: '',
+  collectionLocation: '',
+  collectionDate: getTodayString(),
+  pinnedStatus: true,
+  boxId: '',
+  photographed: false,
+  notes: '',
+};
+
+export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: SpecimenModalProps) {
+  const [formData, setFormData] = useState<SpecimenFormData>(initialFormData);
+  const [errors, setErrors] = useState<Partial<Record<keyof SpecimenFormData, string>>>({});
+
+  useEffect(() => {
+    if (specimen) {
+      setFormData({
+        specimenNo: specimen.specimenNo,
+        species: specimen.species,
+        collectionLocation: specimen.collectionLocation,
+        collectionDate: specimen.collectionDate,
+        pinnedStatus: specimen.pinnedStatus,
+        boxId: specimen.boxId,
+        photographed: specimen.photographed,
+        notes: specimen.notes,
+      });
+    } else {
+      setFormData(initialFormData);
+    }
+    setErrors({});
+  }, [specimen, isOpen]);
+
+  const handleChange = (field: keyof SpecimenFormData, value: string | boolean) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: undefined }));
+    }
+  };
+
+  const validate = (): boolean => {
+    const newErrors: Partial<Record<keyof SpecimenFormData, string>> = {};
+    
+    if (!formData.specimenNo.trim()) {
+      newErrors.specimenNo = '请输入标本编号';
+    }
+    if (!formData.species.trim()) {
+      newErrors.species = '请输入物种名';
+    }
+    if (!formData.boxId) {
+      newErrors.boxId = '请选择展盒';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (validate()) {
+      onSubmit(formData);
+    }
+  };
+
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-oak-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      onClick={handleBackdropClick}
+    >
+      <div className="bg-parchment-50 rounded-xl shadow-hover max-w-lg w-full max-h-[90vh] overflow-y-auto animate-scale-in scrollbar-thin">
+        <div className="sticky top-0 bg-parchment-50 border-b border-oak-200 px-6 py-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-oak-800 font-serif">
+            {specimen ? '编辑标本' : '添加标本'}
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-oak-100 text-oak-500 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                标本编号 <span className="text-rust-600">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.specimenNo}
+                onChange={(e) => handleChange('specimenNo', e.target.value)}
+                placeholder="如: COLE-001"
+                className={`input-field font-mono ${errors.specimenNo ? 'border-rust-400' : ''}`}
+              />
+              {errors.specimenNo && (
+                <p className="text-rust-600 text-xs mt-1">{errors.specimenNo}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                采集日期
+              </label>
+              <input
+                type="date"
+                value={formData.collectionDate}
+                onChange={(e) => handleChange('collectionDate', e.target.value)}
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-oak-700 mb-1.5">
+              物种名 <span className="text-rust-600">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.species}
+              onChange={(e) => handleChange('species', e.target.value)}
+              placeholder="如: 中华大扁锹"
+              className={`input-field ${errors.species ? 'border-rust-400' : ''}`}
+            />
+            {errors.species && (
+              <p className="text-rust-600 text-xs mt-1">{errors.species}</p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-oak-700 mb-1.5">
+              采集地点
+            </label>
+            <input
+              type="text"
+              value={formData.collectionLocation}
+              onChange={(e) => handleChange('collectionLocation', e.target.value)}
+              placeholder="如: 浙江天目山"
+              className="input-field"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-oak-700 mb-1.5">
+              所属展盒 <span className="text-rust-600">*</span>
+            </label>
+            <select
+              value={formData.boxId}
+              onChange={(e) => handleChange('boxId', e.target.value)}
+              className={`input-field ${errors.boxId ? 'border-rust-400' : ''}`}
+            >
+              <option value="">请选择展盒</option>
+              {boxes.map((box) => (
+                <option key={box.id} value={box.id}>
+                  {box.name} ({box.location})
+                </option>
+              ))}
+            </select>
+            {errors.boxId && (
+              <p className="text-rust-600 text-xs mt-1">{errors.boxId}</p>
+            )}
+          </div>
+
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.pinnedStatus}
+                onChange={(e) => handleChange('pinnedStatus', e.target.checked)}
+                className="w-4 h-4 rounded border-oak-300 text-oak-800 focus:ring-oak-500"
+              />
+              <span className="text-sm font-medium text-oak-700">已针插</span>
+            </label>
+
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={formData.photographed}
+                onChange={(e) => handleChange('photographed', e.target.checked)}
+                className="w-4 h-4 rounded border-oak-300 text-oak-800 focus:ring-oak-500"
+              />
+              <span className="text-sm font-medium text-oak-700">已拍照</span>
+            </label>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-oak-700 mb-1.5">
+              备注
+            </label>
+            <textarea
+              value={formData.notes}
+              onChange={(e) => handleChange('notes', e.target.value)}
+              placeholder="补充描述信息..."
+              rows={3}
+              className="input-field resize-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-oak-200">
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+            >
+              {specimen ? '保存修改' : '添加标本'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

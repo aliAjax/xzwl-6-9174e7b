@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply font-sans text-oak-900 bg-parchment-100 min-h-screen;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-oak-800 text-parchment-50 rounded-md font-medium
+           hover:bg-oak-900 transition-all duration-200
+           shadow-card hover:shadow-hover hover:-translate-y-0.5
+           focus:outline-none focus:ring-2 focus:ring-oak-500 focus:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-parchment-50 text-oak-800 border border-oak-300 rounded-md font-medium
+           hover:bg-oak-50 hover:border-oak-400 transition-all duration-200
+           shadow-sm hover:shadow-card;
+  }
+
+  .btn-danger {
+    @apply px-4 py-2 bg-rust-100 text-rust-900 border border-rust-300 rounded-md font-medium
+           hover:bg-rust-200 transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-parchment-50 border border-oak-200 rounded-lg shadow-card
+           hover:shadow-hover transition-all duration-300
+           bg-parchment-texture bg-repeat;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 bg-parchment-50 border border-oak-300 rounded-md
+           text-oak-900 placeholder-oak-400
+           focus:outline-none focus:ring-2 focus:ring-oak-500 focus:border-oak-500
+           transition-all duration-200;
+  }
+
+  .tag {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .decorative-underline {
+    background-image: linear-gradient(to right, #8D6E63, transparent);
+    background-size: 100% 2px;
+    background-repeat: no-repeat;
+    background-position: bottom left;
+    padding-bottom: 6px;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #BCAAA4 transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: #BCAAA4;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: #8D6E63;
+  }
+}
