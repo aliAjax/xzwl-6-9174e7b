@@ -167,3 +167,77 @@ export interface RestoreResult {
     skippedDueToMissingRefs: number;
   };
 }
+
+export type LabelTemplateType = 'pin' | 'box';
+
+export type PaperSizeType = 'A4' | 'A5';
+
+export interface LabelField {
+  key: keyof SpecimenLabelData | 'boxLocation';
+  label: string;
+  required: boolean;
+}
+
+export interface SpecimenLabelData {
+  specimenNo: string;
+  species: string;
+  collectionLocation: string;
+  collectionDate: string;
+  boxLocation: string;
+  photographed: boolean;
+  boxName: string;
+}
+
+export interface LabelFieldCheckResult {
+  specimenId: string;
+  specimenNo: string;
+  missingFields: string[];
+  isValid: boolean;
+}
+
+export interface LabelPrintSettings {
+  templateType: LabelTemplateType;
+  paperSize: PaperSizeType;
+  showGrid: boolean;
+  fontSize: 'small' | 'medium' | 'large';
+}
+
+export const LABEL_FIELDS: LabelField[] = [
+  { key: 'specimenNo', label: '标本编号', required: true },
+  { key: 'species', label: '物种名', required: true },
+  { key: 'collectionLocation', label: '采集地点', required: true },
+  { key: 'collectionDate', label: '采集日期', required: true },
+  { key: 'boxLocation', label: '展盒位置', required: true },
+  { key: 'photographed', label: '拍照状态', required: false },
+];
+
+export const PAPER_SIZES: Record<PaperSizeType, { width: number; height: number; label: string }> = {
+  A4: { width: 210, height: 297, label: 'A4 (210mm × 297mm)' },
+  A5: { width: 148, height: 210, label: 'A5 (148mm × 210mm)' },
+};
+
+export const LABEL_TEMPLATES: Record<LabelTemplateType, {
+  label: string;
+  description: string;
+  width: number;
+  height: number;
+  perRow: Record<PaperSizeType, number>;
+  perPage: Record<PaperSizeType, number>;
+}> = {
+  pin: {
+    label: '针插标本标签',
+    description: '适用于针插标本的小尺寸标签，通常尺寸约 30mm × 15mm',
+    width: 30,
+    height: 15,
+    perRow: { A4: 6, A5: 4 },
+    perPage: { A4: 96, A5: 48 },
+  },
+  box: {
+    label: '展盒贴纸标签',
+    description: '适用于展盒外贴的较大尺寸标签，通常尺寸约 60mm × 40mm',
+    width: 60,
+    height: 40,
+    perRow: { A4: 3, A5: 2 },
+    perPage: { A4: 28, A5: 12 },
+  },
+};

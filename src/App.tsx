@@ -14,6 +14,7 @@ import { ExportModal } from './components/ExportModal';
 import { ImportPreviewModal } from './components/ImportPreviewModal';
 import { BoxTransferModal } from './components/BoxTransferModal';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
+import { LabelPrintModal } from './components/LabelPrintModal';
 import { Bug, ArrowLeft } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
@@ -72,6 +73,7 @@ function App() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [backupRestoreModalOpen, setBackupRestoreModalOpen] = useState(false);
+  const [labelPrintModalOpen, setLabelPrintModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -167,6 +169,7 @@ function App() {
         onOpenImport={() => setImportModalOpen(true)}
         onOpenTransfer={() => setTransferModalOpen(true)}
         onOpenBackupRestore={() => setBackupRestoreModalOpen(true)}
+        onOpenLabelPrint={() => setLabelPrintModalOpen(true)}
         onBackToMain={() => setViewMode('main')}
       />
 
@@ -321,6 +324,16 @@ function App() {
         setBoxes={setBoxes}
         setSpecimens={setSpecimens}
         setBatches={setBatches}
+      />
+
+      <LabelPrintModal
+        isOpen={labelPrintModalOpen}
+        onClose={() => setLabelPrintModalOpen(false)}
+        boxes={boxes}
+        specimens={specimens}
+        batches={batches}
+        currentFilters={filters}
+        filteredSpecimens={filteredSpecimens}
       />
     </div>
   );

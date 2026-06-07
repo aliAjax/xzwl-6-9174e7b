@@ -1,4 +1,4 @@
-import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight, Database } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight, Database, Printer } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
 
@@ -13,6 +13,7 @@ interface HeaderProps {
   onOpenImport: () => void;
   onOpenTransfer: () => void;
   onOpenBackupRestore: () => void;
+  onOpenLabelPrint: () => void;
   onBackToMain: () => void;
 }
 
@@ -27,6 +28,7 @@ export function Header({
   onOpenImport,
   onOpenTransfer,
   onOpenBackupRestore,
+  onOpenLabelPrint,
   onBackToMain,
 }: HeaderProps) {
   return (
@@ -109,6 +111,14 @@ export function Header({
                 >
                   <Download className="w-4 h-4" />
                   <span className="hidden sm:inline">导出数据</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenLabelPrint}
+                  className="flex items-center gap-2 px-4 py-2 bg-moss-600 hover:bg-moss-700 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span className="hidden sm:inline">标签打印</span>
                 </button>
                 <button
                   type="button"
