@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData } from '../types';
+import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData, BoxTransferData } from '../types';
 import { useLocalStorage } from './useLocalStorage';
 import { mockBoxes, mockSpecimens, mockBatches } from '../data/mockData';
 import { generateId } from '../utils/helpers';
@@ -69,6 +69,22 @@ export function useSpecimens() {
     setSpecimens(prev =>
       prev.map(s =>
         idSet.has(s.id) ? { ...s, photographed, updatedAt: now } : s
+      )
+    );
+  }, [setSpecimens]);
+
+  const transferSpecimens = useCallback((data: BoxTransferData) => {
+    const now = new Date().toISOString();
+    const idSet = new Set(data.specimenIds);
+    setSpecimens(prev =>
+      prev.map(s =>
+        idSet.has(s.id)
+          ? {
+              ...s,
+              boxId: data.targetBoxId,
+              updatedAt: now,
+            }
+          : s
       )
     );
   }, [setSpecimens]);
@@ -172,6 +188,7 @@ export function useSpecimens() {
     deleteSpecimen,
     togglePhotographed,
     markPhotographed,
+    transferSpecimens,
     togglePinned,
     addBox,
     updateBox,

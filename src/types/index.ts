@@ -58,6 +58,12 @@ export interface CsvRowData {
   batchId: string;
 }
 
+export interface BoxTransferData {
+  sourceBoxId: string;
+  targetBoxId: string;
+  specimenIds: string[];
+}
+
 export type ValidationErrorType = 
   | 'missing_required' 
   | 'duplicate_no' 

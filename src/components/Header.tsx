@@ -1,4 +1,4 @@
-import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
 
@@ -11,6 +11,7 @@ interface HeaderProps {
   onOpenPhotography: () => void;
   onOpenExport: () => void;
   onOpenImport: () => void;
+  onOpenTransfer: () => void;
   onBackToMain: () => void;
 }
 
@@ -23,6 +24,7 @@ export function Header({
   onOpenPhotography,
   onOpenExport,
   onOpenImport,
+  onOpenTransfer,
   onBackToMain,
 }: HeaderProps) {
   return (
@@ -57,6 +59,14 @@ export function Header({
                 >
                   <Package className="w-4 h-4" />
                   <span className="hidden sm:inline">展盒管理</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenTransfer}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <MoveRight className="w-4 h-4" />
+                  <span className="hidden sm:inline">展盒迁移</span>
                 </button>
                 <button
                   type="button"
