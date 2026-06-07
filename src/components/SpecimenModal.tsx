@@ -54,23 +54,6 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
     }
   };
 
-  const validate = (): boolean => {
-    const newErrors: Partial<Record<keyof SpecimenFormData, string>> = {};
-    
-    if (!formData.specimenNo.trim()) {
-      newErrors.specimenNo = '请输入标本编号';
-    }
-    if (!formData.species.trim()) {
-      newErrors.species = '请输入物种名';
-    }
-    if (!formData.boxId) {
-      newErrors.boxId = '请选择展盒';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formRef.current) return;
@@ -157,6 +140,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
                 name="collectionDate"
                 value={formData.collectionDate}
                 onChange={(e) => handleChange('collectionDate', e.target.value)}
+                onInput={(e) => handleChange('collectionDate', e.currentTarget.value)}
                 className="input-field"
               />
             </div>
