@@ -1,4 +1,4 @@
-import { Bug, Camera, Package, Clock } from 'lucide-react';
+import { Bug, Camera, Package, Clock, ClipboardList } from 'lucide-react';
 
 interface StatsCardProps {
   stats: {
@@ -6,6 +6,7 @@ interface StatsCardProps {
     photographed: number;
     unphotographed: number;
     totalBoxes: number;
+    totalBatches: number;
   };
 }
 
@@ -39,10 +40,17 @@ export function StatsCard({ stats }: StatsCardProps) {
       color: 'text-oak-600',
       bgColor: 'bg-oak-200',
     },
+    {
+      label: '采集批次',
+      value: stats.totalBatches,
+      icon: ClipboardList,
+      color: 'text-moss-600',
+      bgColor: 'bg-moss-100',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
       {statItems.map((item, index) => (
         <div
           key={item.label}

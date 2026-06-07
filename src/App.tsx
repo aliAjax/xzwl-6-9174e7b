@@ -7,12 +7,14 @@ import { FilterBar } from './components/FilterBar';
 import { BoxGroup } from './components/BoxGroup';
 import { SpecimenModal } from './components/SpecimenModal';
 import { BoxModal } from './components/BoxModal';
+import { BatchModal } from './components/BatchModal';
 import { Bug } from 'lucide-react';
 
 function App() {
   const {
     boxes,
     specimens,
+    batches,
     stats,
     addSpecimen,
     updateSpecimen,
@@ -23,17 +25,23 @@ function App() {
     updateBox,
     deleteBox,
     getSpecimensCountByBoxId,
+    addBatch,
+    updateBatch,
+    deleteBatch,
+    getSpecimensCountByBatchId,
   } = useSpecimens();
 
   const [filters, setFilters] = useState<Filters>({
     search: '',
     onlyUnphotographed: false,
     boxId: '',
+    batchId: '',
   });
 
   const [specimenModalOpen, setSpecimenModalOpen] = useState(false);
   const [editingSpecimen, setEditingSpecimen] = useState<Specimen | null>(null);
   const [boxModalOpen, setBoxModalOpen] = useState(false);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -49,6 +57,10 @@ function App() {
       }
 
       if (filters.boxId && s.boxId !== filters.boxId) {
+        return false;
+      }
+
+      if (filters.batchId && s.batchId !== filters.batchId) {
         return false;
       }
 
@@ -101,6 +113,7 @@ function App() {
       <Header
         onAddSpecimen={handleAddSpecimenClick}
         onManageBoxes={() => setBoxModalOpen(true)}
+        onManageBatches={() => setBatchModalOpen(true)}
       />
 
       <main className="flex-1 container px-4 py-6 md:py-8">
@@ -111,6 +124,7 @@ function App() {
             filters={filters}
             onFiltersChange={setFilters}
             boxes={boxes}
+            batches={batches}
           />
 
           {!hasFilteredResults && filteredSpecimens.length === 0 ? (
@@ -137,6 +151,7 @@ function App() {
                   key={box.id}
                   box={box}
                   specimens={getSpecimensForBox(box.id)}
+                  batches={batches}
                   onSpecimenClick={handleSpecimenClick}
                   onTogglePhotographed={togglePhotographed}
                   onTogglePinned={togglePinned}
@@ -164,6 +179,7 @@ function App() {
         onSubmit={handleSpecimenSubmit}
         specimen={editingSpecimen}
         boxes={boxes}
+        batches={batches}
       />
 
       <BoxModal
@@ -174,6 +190,16 @@ function App() {
         onUpdateBox={updateBox}
         onDeleteBox={deleteBox}
         getSpecimensCountByBoxId={getSpecimensCountByBoxId}
+      />
+
+      <BatchModal
+        isOpen={batchModalOpen}
+        onClose={() => setBatchModalOpen(false)}
+        batches={batches}
+        onAddBatch={addBatch}
+        onUpdateBatch={updateBatch}
+        onDeleteBatch={deleteBatch}
+        getSpecimensCountByBatchId={getSpecimensCountByBatchId}
       />
     </div>
   );

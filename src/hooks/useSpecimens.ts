@@ -1,15 +1,17 @@
 import { useCallback } from 'react';
-import type { Box, Specimen, SpecimenFormData, BoxFormData } from '../types';
+import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData } from '../types';
 import { useLocalStorage } from './useLocalStorage';
-import { mockBoxes, mockSpecimens } from '../data/mockData';
+import { mockBoxes, mockSpecimens, mockBatches } from '../data/mockData';
 import { generateId } from '../utils/helpers';
 
 const BOXES_KEY = 'insect_boxes';
 const SPECIMENS_KEY = 'insect_specimens';
+const BATCHES_KEY = 'insect_batches';
 
 export function useSpecimens() {
   const [boxes, setBoxes] = useLocalStorage<Box[]>(BOXES_KEY, mockBoxes);
   const [specimens, setSpecimens] = useLocalStorage<Specimen[]>(SPECIMENS_KEY, mockSpecimens);
+  const [batches, setBatches] = useLocalStorage<CollectionBatch[]>(BATCHES_KEY, mockBatches);
 
   const addSpecimen = useCallback((data: SpecimenFormData) => {
     const now = new Date().toISOString();
@@ -90,16 +92,54 @@ export function useSpecimens() {
     return specimens.filter(s => s.boxId === boxId).length;
   }, [specimens]);
 
+  const addBatch = useCallback((data: CollectionBatchFormData) => {
+    const newBatch: CollectionBatch = {
+      ...data,
+      id: generateId(),
+      createdAt: new Date().toISOString(),
+    };
+    setBatches(prev => [...prev, newBatch]);
+    return newBatch;
+  }, [setBatches]);
+
+  const updateBatch = useCallback((id: string, data: Partial<CollectionBatchFormData>) => {
+    setBatches(prev =>
+      prev.map(b => (b.id === id ? { ...b, ...data } : b))
+    );
+  }, [setBatches]);
+
+  const deleteBatch = useCallback((id: string) => {
+    const hasSpecimens = specimens.some(s => s.batchId === id);
+    if (hasSpecimens) {
+      throw new Error('无法删除包含标本的采集批次');
+    }
+    setBatches(prev => prev.filter(b => b.id !== id));
+  }, [setBatches, specimens]);
+
+  const getBatchById = useCallback((id: string) => {
+    return batches.find(b => b.id === id);
+  }, [batches]);
+
+  const getSpecimensByBatchId = useCallback((batchId: string) => {
+    return specimens.filter(s => s.batchId === batchId);
+  }, [specimens]);
+
+  const getSpecimensCountByBatchId = useCallback((batchId: string) => {
+    return specimens.filter(s => s.batchId === batchId).length;
+  }, [specimens]);
+
   const stats = {
     totalSpecimens: specimens.length,
     photographed: specimens.filter(s => s.photographed).length,
     unphotographed: specimens.filter(s => !s.photographed).length,
     totalBoxes: boxes.length,
+    totalBatches: batches.length,
   };
 
   return {
     boxes,
     specimens,
+    batches,
     stats,
     addSpecimen,
     updateSpecimen,
@@ -112,5 +152,11 @@ export function useSpecimens() {
     getBoxById,
     getSpecimensByBoxId,
     getSpecimensCountByBoxId,
+    addBatch,
+    updateBatch,
+    deleteBatch,
+    getBatchById,
+    getSpecimensByBatchId,
+    getSpecimensCountByBatchId,
   };
 }

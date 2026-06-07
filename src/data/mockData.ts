@@ -1,4 +1,4 @@
-import type { Box, Specimen } from '../types';
+import type { Box, Specimen, CollectionBatch } from '../types';
 import { generateId } from '../utils/helpers';
 
 const now = new Date().toISOString();
@@ -27,6 +27,36 @@ export const mockBoxes: Box[] = [
   },
 ];
 
+export const mockBatches: CollectionBatch[] = [
+  {
+    id: 'batch-1',
+    name: '2024年夏季天目山考察',
+    collectionDate: '2024-07-10',
+    location: '浙江天目山国家级自然保护区',
+    participants: '张三、李四、王五',
+    notes: '为期7天的鞘翅目专项调查，共采集标本120余号',
+    createdAt: now,
+  },
+  {
+    id: 'batch-2',
+    name: '2024年武夷山考察',
+    collectionDate: '2024-08-01',
+    location: '福建武夷山',
+    participants: '李四、赵六',
+    notes: '重点调查金龟科昆虫',
+    createdAt: now,
+  },
+  {
+    id: 'batch-3',
+    name: '2024年西双版纳考察',
+    collectionDate: '2024-06-15',
+    location: '云南西双版纳热带植物园',
+    participants: '张三、王五',
+    notes: '热带雨林昆虫多样性调查',
+    createdAt: now,
+  },
+];
+
 export const mockSpecimens: Specimen[] = [
   {
     id: generateId(),
@@ -36,6 +66,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-07-15',
     pinnedStatus: true,
     boxId: 'box-1',
+    batchId: 'batch-1',
     photographed: true,
     notes: '雄性成虫，体长约65mm',
     createdAt: now,
@@ -49,6 +80,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-08-02',
     pinnedStatus: true,
     boxId: 'box-1',
+    batchId: 'batch-2',
     photographed: false,
     notes: '国家二级保护动物，持证采集',
     createdAt: now,
@@ -62,6 +94,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-06-20',
     pinnedStatus: true,
     boxId: 'box-1',
+    batchId: 'batch-3',
     photographed: true,
     notes: '头部角突完整',
     createdAt: now,
@@ -75,6 +108,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-09-10',
     pinnedStatus: false,
     boxId: 'box-1',
+    batchId: '',
     photographed: false,
     notes: '待针插固定',
     createdAt: now,
@@ -88,6 +122,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-05-18',
     pinnedStatus: true,
     boxId: 'box-2',
+    batchId: '',
     photographed: true,
     notes: '雌性，翅膀完好',
     createdAt: now,
@@ -101,6 +136,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-03-22',
     pinnedStatus: true,
     boxId: 'box-2',
+    batchId: '',
     photographed: false,
     notes: '蓝色金属光泽强烈',
     createdAt: now,
@@ -114,6 +150,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-07-08',
     pinnedStatus: true,
     boxId: 'box-2',
+    batchId: '',
     photographed: true,
     notes: '翅展约210mm',
     createdAt: now,
@@ -127,6 +164,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-08-15',
     pinnedStatus: false,
     boxId: 'box-2',
+    batchId: '',
     photographed: false,
     notes: '展翅未完成',
     createdAt: now,
@@ -140,6 +178,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-10-05',
     pinnedStatus: true,
     boxId: 'box-3',
+    batchId: '',
     photographed: true,
     notes: '蜂王个体，体长约45mm',
     createdAt: now,
@@ -153,6 +192,7 @@ export const mockSpecimens: Specimen[] = [
     collectionDate: '2024-09-20',
     pinnedStatus: true,
     boxId: 'box-3',
+    batchId: '',
     photographed: false,
     notes: '工蜂标本',
     createdAt: now,

@@ -1,10 +1,11 @@
 import { Package, MapPin } from 'lucide-react';
-import type { Box, Specimen } from '../types';
+import type { Box, Specimen, CollectionBatch } from '../types';
 import { SpecimenCard } from './SpecimenCard';
 
 interface BoxGroupProps {
   box: Box;
   specimens: Specimen[];
+  batches: CollectionBatch[];
   onSpecimenClick: (specimen: Specimen) => void;
   onTogglePhotographed: (id: string) => void;
   onTogglePinned: (id: string) => void;
@@ -15,6 +16,7 @@ interface BoxGroupProps {
 export function BoxGroup({
   box,
   specimens,
+  batches,
   onSpecimenClick,
   onTogglePhotographed,
   onTogglePinned,
@@ -65,6 +67,7 @@ export function BoxGroup({
             <SpecimenCard
               key={specimen.id}
               specimen={specimen}
+              batch={batches.find(b => b.id === specimen.batchId)}
               onClick={() => onSpecimenClick(specimen)}
               onTogglePhotographed={() => onTogglePhotographed(specimen.id)}
               onTogglePinned={() => onTogglePinned(specimen.id)}

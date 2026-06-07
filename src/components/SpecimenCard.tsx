@@ -1,9 +1,10 @@
-import { Camera, Pin, MapPin, Calendar, Edit2, Trash2 } from 'lucide-react';
-import type { Specimen } from '../types';
+import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList } from 'lucide-react';
+import type { Specimen, CollectionBatch } from '../types';
 import { formatDate } from '../utils/helpers';
 
 interface SpecimenCardProps {
   specimen: Specimen;
+  batch: CollectionBatch | undefined;
   onClick: () => void;
   onTogglePhotographed: () => void;
   onTogglePinned: () => void;
@@ -13,6 +14,7 @@ interface SpecimenCardProps {
 
 export function SpecimenCard({
   specimen,
+  batch,
   onClick,
   onTogglePhotographed,
   onTogglePinned,
@@ -73,6 +75,12 @@ export function SpecimenCard({
           <Calendar className="w-4 h-4 text-oak-400 flex-shrink-0" />
           <span>{formatDate(specimen.collectionDate)}</span>
         </div>
+        {batch && (
+          <div className="flex items-center gap-2 text-sm text-oak-600">
+            <ClipboardList className="w-4 h-4 text-moss-500 flex-shrink-0" />
+            <span className="truncate font-medium text-moss-700">{batch.name}</span>
+          </div>
+        )}
       </div>
 
       {specimen.notes && (

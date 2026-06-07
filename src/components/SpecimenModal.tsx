@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import type { Box, Specimen, SpecimenFormData } from '../types';
+import type { Box, Specimen, SpecimenFormData, CollectionBatch } from '../types';
 import { getTodayString } from '../utils/helpers';
 
 interface SpecimenModalProps {
@@ -9,6 +9,7 @@ interface SpecimenModalProps {
   onSubmit: (data: SpecimenFormData) => void;
   specimen: Specimen | null;
   boxes: Box[];
+  batches: CollectionBatch[];
 }
 
 const getInitialFormData = (): SpecimenFormData => ({
@@ -18,11 +19,12 @@ const getInitialFormData = (): SpecimenFormData => ({
   collectionDate: getTodayString(),
   pinnedStatus: true,
   boxId: '',
+  batchId: '',
   photographed: false,
   notes: '',
 });
 
-export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: SpecimenModalProps) {
+export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batches }: SpecimenModalProps) {
   const [formData, setFormData] = useState<SpecimenFormData>(getInitialFormData());
   const [errors, setErrors] = useState<Partial<Record<keyof SpecimenFormData, string>>>({});
   const formRef = useRef<HTMLFormElement>(null);
@@ -37,6 +39,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
           collectionDate: specimen.collectionDate,
           pinnedStatus: specimen.pinnedStatus,
           boxId: specimen.boxId,
+          batchId: specimen.batchId,
           photographed: specimen.photographed,
           notes: specimen.notes,
         });
@@ -68,6 +71,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
       collectionDate: (formData.get('collectionDate') as string) || getTodayString(),
       pinnedStatus: formData.get('pinnedStatus') === 'on',
       boxId: (formData.get('boxId') as string) || '',
+      batchId: (formData.get('batchId') as string) || '',
       photographed: formData.get('photographed') === 'on',
       notes: (formData.get('notes') as string) || '',
     };
@@ -197,6 +201,25 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
             {errors.boxId && (
               <p className="text-rust-600 text-xs mt-1">{errors.boxId}</p>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-oak-700 mb-1.5">
+              采集批次
+            </label>
+            <select
+              name="batchId"
+              value={formData.batchId}
+              onChange={(e) => handleChange('batchId', e.target.value)}
+              className="input-field"
+            >
+              <option value="">未关联批次</option>
+              {batches.map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="flex items-center gap-6">

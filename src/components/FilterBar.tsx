@@ -1,13 +1,14 @@
 import { Search, X } from 'lucide-react';
-import type { Box, Filters } from '../types';
+import type { Box, Filters, CollectionBatch } from '../types';
 
 interface FilterBarProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
   boxes: Box[];
+  batches: CollectionBatch[];
 }
 
-export function FilterBar({ filters, onFiltersChange, boxes }: FilterBarProps) {
+export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBarProps) {
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, search: value });
   };
@@ -20,15 +21,20 @@ export function FilterBar({ filters, onFiltersChange, boxes }: FilterBarProps) {
     onFiltersChange({ ...filters, boxId: value });
   };
 
+  const handleBatchChange = (value: string) => {
+    onFiltersChange({ ...filters, batchId: value });
+  };
+
   const clearFilters = () => {
     onFiltersChange({
       search: '',
       onlyUnphotographed: false,
       boxId: '',
+      batchId: '',
     });
   };
 
-  const hasActiveFilters = filters.search || filters.onlyUnphotographed || filters.boxId;
+  const hasActiveFilters = filters.search || filters.onlyUnphotographed || filters.boxId || filters.batchId;
 
   return (
     <div className="bg-parchment-50 border border-oak-200 rounded-xl p-4 shadow-card">
@@ -72,6 +78,25 @@ export function FilterBar({ filters, onFiltersChange, boxes }: FilterBarProps) {
               {boxes.map((box) => (
                 <option key={box.id} value={box.id}>
                   {box.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="batch-filter" className="text-oak-600 text-sm font-medium whitespace-nowrap">
+              批次:
+            </label>
+            <select
+              id="batch-filter"
+              value={filters.batchId}
+              onChange={(e) => handleBatchChange(e.target.value)}
+              className="input-field max-w-48"
+            >
+              <option value="">全部批次</option>
+              {batches.map((batch) => (
+                <option key={batch.id} value={batch.id}>
+                  {batch.name}
                 </option>
               ))}
             </select>
