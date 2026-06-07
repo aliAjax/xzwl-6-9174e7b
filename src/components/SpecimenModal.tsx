@@ -78,8 +78,6 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
 
     const newErrors: Partial<Record<keyof SpecimenFormData, string>> = {};
     if (!submitData.specimenNo.trim()) newErrors.specimenNo = '请输入标本编号';
-    if (!submitData.species.trim()) newErrors.species = '请输入物种名';
-    if (!submitData.boxId) newErrors.boxId = '请选择展盒';
     
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -152,7 +150,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
 
           <div>
             <label className="block text-sm font-medium text-oak-700 mb-1.5">
-              物种名 <span className="text-rust-600">*</span>
+              物种名 <span className="text-oak-400 text-xs font-normal">(建议填写)</span>
             </label>
             <input
               type="text"
@@ -183,7 +181,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
 
           <div>
             <label className="block text-sm font-medium text-oak-700 mb-1.5">
-              所属展盒 <span className="text-rust-600">*</span>
+              所属展盒 <span className="text-oak-400 text-xs font-normal">(建议填写)</span>
             </label>
             <select
               name="boxId"

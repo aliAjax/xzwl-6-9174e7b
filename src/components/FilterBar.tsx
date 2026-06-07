@@ -75,6 +75,8 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
               className="input-field max-w-48"
             >
               <option value="">全部展盒</option>
+              <option value="__unassigned__">未分配展盒 (草稿)</option>
+              <option value="">---</option>
               {boxes.map((box) => (
                 <option key={box.id} value={box.id}>
                   {box.name}

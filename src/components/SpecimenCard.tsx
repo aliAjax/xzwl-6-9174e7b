@@ -1,4 +1,4 @@
-import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList } from 'lucide-react';
+import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList, FileEdit } from 'lucide-react';
 import type { Specimen, CollectionBatch } from '../types';
 import { formatDate } from '../utils/helpers';
 
@@ -25,19 +25,35 @@ export function SpecimenCard({
     e.stopPropagation();
   };
 
+  const isDraft = !specimen.species.trim();
+
   return (
     <div
-      className="card p-4 cursor-pointer group opacity-0 animate-fade-in-up"
+      className={`card p-4 cursor-pointer group opacity-0 animate-fade-in-up ${
+        isDraft ? 'border-dashed border-oak-300' : ''
+      }`}
       style={{ animationDelay: `${index * 0.05}s` }}
       onClick={onClick}
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <span className="inline-block px-2 py-1 bg-oak-100 text-oak-700 text-xs font-mono rounded mb-2">
-            {specimen.specimenNo}
-          </span>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="inline-block px-2 py-1 bg-oak-100 text-oak-700 text-xs font-mono rounded">
+              {specimen.specimenNo}
+            </span>
+            {isDraft && (
+              <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 text-amber-700 text-xs font-medium rounded">
+                <FileEdit className="w-3 h-3" />
+                草稿
+              </span>
+            )}
+          </div>
           <h3 className="text-lg font-semibold text-oak-900 font-serif leading-tight">
-            {specimen.species}
+            {isDraft ? (
+              <span className="text-oak-400 italic">待鉴定物种...</span>
+            ) : (
+              specimen.species
+            )}
           </h3>
         </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -69,7 +85,11 @@ export function SpecimenCard({
       <div className="space-y-2 mb-4">
         <div className="flex items-center gap-2 text-sm text-oak-600">
           <MapPin className="w-4 h-4 text-oak-400 flex-shrink-0" />
-          <span className="truncate">{specimen.collectionLocation}</span>
+          <span className="truncate">
+            {specimen.collectionLocation || (
+              <span className="text-oak-400 italic">未填写采集地点</span>
+            )}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-oak-600">
           <Calendar className="w-4 h-4 text-oak-400 flex-shrink-0" />

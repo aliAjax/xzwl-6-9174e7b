@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import type { Specimen, SpecimenFormData, Filters } from './types';
+import type { Box, Specimen, SpecimenFormData, Filters } from './types';
 import { useSpecimens } from './hooks/useSpecimens';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
@@ -8,6 +8,7 @@ import { BoxGroup } from './components/BoxGroup';
 import { SpecimenModal } from './components/SpecimenModal';
 import { BoxModal } from './components/BoxModal';
 import { BatchModal } from './components/BatchModal';
+import { SpecimenNoGenerator } from './components/SpecimenNoGenerator';
 import { Bug } from 'lucide-react';
 
 function App() {
@@ -29,6 +30,8 @@ function App() {
     updateBatch,
     deleteBatch,
     getSpecimensCountByBatchId,
+    checkSpecimenNoExists,
+    addSpecimensBatch,
   } = useSpecimens();
 
   const [filters, setFilters] = useState<Filters>({
@@ -42,6 +45,7 @@ function App() {
   const [editingSpecimen, setEditingSpecimen] = useState<Specimen | null>(null);
   const [boxModalOpen, setBoxModalOpen] = useState(false);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -56,7 +60,9 @@ function App() {
         return false;
       }
 
-      if (filters.boxId && s.boxId !== filters.boxId) {
+      if (filters.boxId === '__unassigned__') {
+        if (s.boxId) return false;
+      } else if (filters.boxId && s.boxId !== filters.boxId) {
         return false;
       }
 
@@ -68,14 +74,36 @@ function App() {
     });
   }, [specimens, filters]);
 
+  const unassignedBox: Box = {
+    id: '',
+    name: '未分配展盒',
+    location: '草稿标本',
+    notes: '暂未指定展盒的标本草稿',
+    createdAt: new Date().toISOString(),
+  };
+
   const boxesToShow = useMemo(() => {
-    if (filters.boxId) {
-      return boxes.filter((b) => b.id === filters.boxId);
+    const unassignedSpecimens = filteredSpecimens.filter((s) => !s.boxId);
+    let result = [...boxes];
+
+    if (filters.boxId === '__unassigned__') {
+      if (unassignedSpecimens.length > 0) {
+        return [unassignedBox];
+      }
+      return [];
+    } else if (filters.boxId) {
+      result = boxes.filter((b) => b.id === filters.boxId);
+    } else if (unassignedSpecimens.length > 0) {
+      result = [unassignedBox, ...result];
     }
-    return boxes;
-  }, [boxes, filters.boxId]);
+
+    return result;
+  }, [boxes, filters.boxId, filteredSpecimens]);
 
   const getSpecimensForBox = (boxId: string) => {
+    if (boxId === '') {
+      return filteredSpecimens.filter((s) => !s.boxId);
+    }
     return filteredSpecimens.filter((s) => s.boxId === boxId);
   };
 
@@ -114,6 +142,7 @@ function App() {
         onAddSpecimen={handleAddSpecimenClick}
         onManageBoxes={() => setBoxModalOpen(true)}
         onManageBatches={() => setBatchModalOpen(true)}
+        onOpenGenerator={() => setGeneratorOpen(true)}
       />
 
       <main className="flex-1 container px-4 py-6 md:py-8">
@@ -200,6 +229,14 @@ function App() {
         onUpdateBatch={updateBatch}
         onDeleteBatch={deleteBatch}
         getSpecimensCountByBatchId={getSpecimensCountByBatchId}
+      />
+
+      <SpecimenNoGenerator
+        isOpen={generatorOpen}
+        onClose={() => setGeneratorOpen(false)}
+        boxes={boxes}
+        checkSpecimenNoExists={checkSpecimenNoExists}
+        addSpecimensBatch={addSpecimensBatch}
       />
     </div>
   );

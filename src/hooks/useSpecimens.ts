@@ -25,6 +25,22 @@ export function useSpecimens() {
     return newSpecimen;
   }, [setSpecimens]);
 
+  const checkSpecimenNoExists = useCallback((specimenNo: string) => {
+    return specimens.some(s => s.specimenNo === specimenNo);
+  }, [specimens]);
+
+  const addSpecimensBatch = useCallback((dataList: SpecimenFormData[]) => {
+    const now = new Date().toISOString();
+    const newSpecimens: Specimen[] = dataList.map(data => ({
+      ...data,
+      id: generateId(),
+      createdAt: now,
+      updatedAt: now,
+    }));
+    setSpecimens(prev => [...prev, ...newSpecimens]);
+    return newSpecimens;
+  }, [setSpecimens]);
+
   const updateSpecimen = useCallback((id: string, data: Partial<SpecimenFormData>) => {
     const now = new Date().toISOString();
     setSpecimens(prev =>
@@ -158,5 +174,7 @@ export function useSpecimens() {
     getBatchById,
     getSpecimensByBatchId,
     getSpecimensCountByBatchId,
+    checkSpecimenNoExists,
+    addSpecimensBatch,
   };
 }
