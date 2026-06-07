@@ -11,6 +11,14 @@ import { BatchModal } from './components/BatchModal';
 import { SpecimenNoGenerator } from './components/SpecimenNoGenerator';
 import { Bug } from 'lucide-react';
 
+const UNASSIGNED_BOX: Box = {
+  id: '',
+  name: '未分配展盒',
+  location: '草稿标本',
+  notes: '暂未指定展盒的标本草稿',
+  createdAt: new Date().toISOString(),
+};
+
 function App() {
   const {
     boxes,
@@ -74,27 +82,19 @@ function App() {
     });
   }, [specimens, filters]);
 
-  const unassignedBox: Box = {
-    id: '',
-    name: '未分配展盒',
-    location: '草稿标本',
-    notes: '暂未指定展盒的标本草稿',
-    createdAt: new Date().toISOString(),
-  };
-
   const boxesToShow = useMemo(() => {
     const unassignedSpecimens = filteredSpecimens.filter((s) => !s.boxId);
     let result = [...boxes];
 
     if (filters.boxId === '__unassigned__') {
       if (unassignedSpecimens.length > 0) {
-        return [unassignedBox];
+        return [UNASSIGNED_BOX];
       }
       return [];
     } else if (filters.boxId) {
       result = boxes.filter((b) => b.id === filters.boxId);
     } else if (unassignedSpecimens.length > 0) {
-      result = [unassignedBox, ...result];
+      result = [UNASSIGNED_BOX, ...result];
     }
 
     return result;

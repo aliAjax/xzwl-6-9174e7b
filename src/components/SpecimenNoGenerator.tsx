@@ -132,8 +132,6 @@ export function SpecimenNoGenerator({
 
   if (!isOpen) return null;
 
-  const effectivePrefix = orderPrefix === 'OTHER' ? customPrefix.toUpperCase() : orderPrefix;
-
   return (
     <div
       className="fixed inset-0 bg-oak-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
