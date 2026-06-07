@@ -22,6 +22,13 @@ const UNASSIGNED_BOX: Box = {
   createdAt: new Date().toISOString(),
 };
 
+const UNASSIGNED_BOX_SELECT_VALUE = '__unassigned__';
+
+const getBoxSelectValue = (box: Box) => box.id || UNASSIGNED_BOX_SELECT_VALUE;
+
+const getBoxIdFromSelectValue = (value: string) =>
+  value === UNASSIGNED_BOX_SELECT_VALUE ? '' : value;
+
 export function BoxTransferModal({
   isOpen,
   onClose,
@@ -44,21 +51,22 @@ export function BoxTransferModal({
   }, [boxes, specimens]);
 
   const sourceBox = useMemo(() => {
-    if (sourceBoxId === '') {
+    if (sourceBoxId === UNASSIGNED_BOX_SELECT_VALUE) {
       return allBoxes.find(b => b.id === '') || null;
     }
     return allBoxes.find(b => b.id === sourceBoxId) || null;
   }, [sourceBoxId, allBoxes]);
 
   const targetBox = useMemo(() => {
-    if (targetBoxId === '') {
+    if (targetBoxId === UNASSIGNED_BOX_SELECT_VALUE) {
       return allBoxes.find(b => b.id === '') || null;
     }
     return allBoxes.find(b => b.id === targetBoxId) || null;
   }, [targetBoxId, allBoxes]);
 
   const availableSpecimens = useMemo(() => {
-    return specimens.filter(s => s.boxId === sourceBoxId);
+    const actualSourceBoxId = getBoxIdFromSelectValue(sourceBoxId);
+    return specimens.filter(s => s.boxId === actualSourceBoxId);
   }, [specimens, sourceBoxId]);
 
   const filteredAvailableSpecimens = useMemo(() => {
@@ -73,7 +81,8 @@ export function BoxTransferModal({
   const hasActiveFilters = currentFilters.search || currentFilters.onlyUnphotographed || currentFilters.boxId || currentFilters.batchId;
 
   const selectAllFromFiltered = () => {
-    const filteredFromSource = filteredSpecimens.filter(s => s.boxId === sourceBoxId);
+    const actualSourceBoxId = getBoxIdFromSelectValue(sourceBoxId);
+    const filteredFromSource = filteredSpecimens.filter(s => s.boxId === actualSourceBoxId);
     setSelectedSpecimenIds(new Set(filteredFromSource.map(s => s.id)));
   };
 
@@ -104,14 +113,18 @@ export function BoxTransferModal({
 
   const handleTransferClick = () => {
     if (selectedSpecimenIds.size === 0) return;
-    if (!sourceBoxId && sourceBoxId !== '') return;
-    if (!targetBoxId && targetBoxId !== '') return;
+    if (!sourceBoxId) return;
+    if (!targetBoxId) return;
     if (sourceBoxId === targetBoxId) return;
     setShowConfirm(true);
   };
 
   const handleConfirmTransfer = () => {
-    onTransfer(sourceBoxId, targetBoxId, Array.from(selectedSpecimenIds));
+    onTransfer(
+      getBoxIdFromSelectValue(sourceBoxId),
+      getBoxIdFromSelectValue(targetBoxId),
+      Array.from(selectedSpecimenIds)
+    );
     setShowConfirm(false);
     setSourceBoxId('');
     setTargetBoxId('');
@@ -123,6 +136,7 @@ export function BoxTransferModal({
   const getBatchById = (id: string) => batches.find(b => b.id === id);
 
   const canTransfer = selectedSpecimenIds.size > 0 &&
+    sourceBoxId !== '' &&
     sourceBoxId !== targetBoxId &&
     targetBoxId !== '';
 
@@ -167,7 +181,7 @@ export function BoxTransferModal({
               >
                 <option value="">请选择来源展盒</option>
                 {allBoxes.map((box) => (
-                  <option key={box.id || '__unassigned__'} value={box.id}>
+                  <option key={box.id || UNASSIGNED_BOX_SELECT_VALUE} value={getBoxSelectValue(box)}>
                     {box.name} ({specimens.filter(s => s.boxId === box.id).length} 件标本)
                   </option>
                 ))}
@@ -198,9 +212,9 @@ export function BoxTransferModal({
               >
                 <option value="">请选择目标展盒</option>
                 {allBoxes
-                  .filter(b => b.id !== sourceBoxId)
+                  .filter(b => getBoxSelectValue(b) !== sourceBoxId)
                   .map((box) => (
-                    <option key={box.id || '__unassigned__'} value={box.id}>
+                    <option key={box.id || UNASSIGNED_BOX_SELECT_VALUE} value={getBoxSelectValue(box)}>
                       {box.name} ({specimens.filter(s => s.boxId === box.id).length} 件标本)
                     </option>
                   ))}
@@ -246,7 +260,7 @@ export function BoxTransferModal({
                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-oak-100 text-oak-700 rounded-md hover:bg-oak-200 transition-colors"
                     >
                       <Filter className="w-4 h-4" />
-                      选择当前筛选结果 ({filteredSpecimens.filter(s => s.boxId === sourceBoxId).length} 件)
+                      选择当前筛选结果 ({filteredSpecimens.filter(s => s.boxId === getBoxIdFromSelectValue(sourceBoxId)).length} 件)
                     </button>
                   )}
                   <button
