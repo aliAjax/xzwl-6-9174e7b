@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { Box, Specimen, SpecimenFormData } from '../types';
 import { getTodayString } from '../utils/helpers';
@@ -11,7 +11,7 @@ interface SpecimenModalProps {
   boxes: Box[];
 }
 
-const initialFormData: SpecimenFormData = {
+const getInitialFormData = (): SpecimenFormData => ({
   specimenNo: '',
   species: '',
   collectionLocation: '',
@@ -20,28 +20,31 @@ const initialFormData: SpecimenFormData = {
   boxId: '',
   photographed: false,
   notes: '',
-};
+});
 
 export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: SpecimenModalProps) {
-  const [formData, setFormData] = useState<SpecimenFormData>(initialFormData);
+  const [formData, setFormData] = useState<SpecimenFormData>(getInitialFormData());
   const [errors, setErrors] = useState<Partial<Record<keyof SpecimenFormData, string>>>({});
+  const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    if (specimen) {
-      setFormData({
-        specimenNo: specimen.specimenNo,
-        species: specimen.species,
-        collectionLocation: specimen.collectionLocation,
-        collectionDate: specimen.collectionDate,
-        pinnedStatus: specimen.pinnedStatus,
-        boxId: specimen.boxId,
-        photographed: specimen.photographed,
-        notes: specimen.notes,
-      });
-    } else {
-      setFormData(initialFormData);
+    if (isOpen) {
+      if (specimen) {
+        setFormData({
+          specimenNo: specimen.specimenNo,
+          species: specimen.species,
+          collectionLocation: specimen.collectionLocation,
+          collectionDate: specimen.collectionDate,
+          pinnedStatus: specimen.pinnedStatus,
+          boxId: specimen.boxId,
+          photographed: specimen.photographed,
+          notes: specimen.notes,
+        });
+      } else {
+        setFormData(getInitialFormData());
+      }
+      setErrors({});
     }
-    setErrors({});
   }, [specimen, isOpen]);
 
   const handleChange = (field: keyof SpecimenFormData, value: string | boolean) => {
@@ -70,9 +73,33 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) {
-      onSubmit(formData);
+    if (!formRef.current) return;
+    
+    const formElement = formRef.current;
+    const formData = new FormData(formElement);
+    
+    const submitData: SpecimenFormData = {
+      specimenNo: (formData.get('specimenNo') as string) || '',
+      species: (formData.get('species') as string) || '',
+      collectionLocation: (formData.get('collectionLocation') as string) || '',
+      collectionDate: (formData.get('collectionDate') as string) || getTodayString(),
+      pinnedStatus: formData.get('pinnedStatus') === 'on',
+      boxId: (formData.get('boxId') as string) || '',
+      photographed: formData.get('photographed') === 'on',
+      notes: (formData.get('notes') as string) || '',
+    };
+
+    const newErrors: Partial<Record<keyof SpecimenFormData, string>> = {};
+    if (!submitData.specimenNo.trim()) newErrors.specimenNo = '请输入标本编号';
+    if (!submitData.species.trim()) newErrors.species = '请输入物种名';
+    if (!submitData.boxId) newErrors.boxId = '请选择展盒';
+    
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
     }
+    
+    onSubmit(submitData);
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
@@ -102,7 +129,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-oak-700 mb-1.5">
@@ -110,6 +137,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
               </label>
               <input
                 type="text"
+                name="specimenNo"
                 value={formData.specimenNo}
                 onChange={(e) => handleChange('specimenNo', e.target.value)}
                 placeholder="如: COLE-001"
@@ -126,6 +154,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
               </label>
               <input
                 type="date"
+                name="collectionDate"
                 value={formData.collectionDate}
                 onChange={(e) => handleChange('collectionDate', e.target.value)}
                 className="input-field"
@@ -139,6 +168,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
             </label>
             <input
               type="text"
+              name="species"
               value={formData.species}
               onChange={(e) => handleChange('species', e.target.value)}
               placeholder="如: 中华大扁锹"
@@ -155,6 +185,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
             </label>
             <input
               type="text"
+              name="collectionLocation"
               value={formData.collectionLocation}
               onChange={(e) => handleChange('collectionLocation', e.target.value)}
               placeholder="如: 浙江天目山"
@@ -167,6 +198,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
               所属展盒 <span className="text-rust-600">*</span>
             </label>
             <select
+              name="boxId"
               value={formData.boxId}
               onChange={(e) => handleChange('boxId', e.target.value)}
               className={`input-field ${errors.boxId ? 'border-rust-400' : ''}`}
@@ -187,6 +219,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
+                name="pinnedStatus"
                 checked={formData.pinnedStatus}
                 onChange={(e) => handleChange('pinnedStatus', e.target.checked)}
                 className="w-4 h-4 rounded border-oak-300 text-oak-800 focus:ring-oak-500"
@@ -197,6 +230,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
+                name="photographed"
                 checked={formData.photographed}
                 onChange={(e) => handleChange('photographed', e.target.checked)}
                 className="w-4 h-4 rounded border-oak-300 text-oak-800 focus:ring-oak-500"
@@ -210,6 +244,7 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes }: Sp
               备注
             </label>
             <textarea
+              name="notes"
               value={formData.notes}
               onChange={(e) => handleChange('notes', e.target.value)}
               placeholder="补充描述信息..."
