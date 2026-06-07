@@ -147,27 +147,27 @@ const MATCH_PRIORITY: (keyof CsvRowData | 'boxName')[] = [
 
 export const autoDetectFieldMapping = (headers: string[]): CsvFieldMapping => {
   const mapping: CsvFieldMapping = {};
-  
+
   headers.forEach((header) => {
     const normalizedHeader = header.trim().toLowerCase();
     let matchedField: keyof CsvRowData | 'boxName' | null = null;
 
     for (const field of MATCH_PRIORITY) {
       const patterns = FIELD_NAME_PATTERNS[field];
-      
-      const exactMatch = patterns.exact.some((pattern) => 
+
+      const exactMatch = patterns.exact.some((pattern) =>
         normalizedHeader === pattern.toLowerCase()
       );
-      
+
       if (exactMatch) {
         matchedField = field;
         break;
       }
-      
-      const containsMatch = patterns.contains.some((pattern) => 
+
+      const containsMatch = patterns.contains.some((pattern) =>
         normalizedHeader.includes(pattern.toLowerCase())
       );
-      
+
       if (containsMatch) {
         matchedField = field;
         break;
