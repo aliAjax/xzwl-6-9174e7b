@@ -13,6 +13,7 @@ import { PhotographyTaskList } from './components/PhotographyTaskList';
 import { ExportModal } from './components/ExportModal';
 import { ImportPreviewModal } from './components/ImportPreviewModal';
 import { BoxTransferModal } from './components/BoxTransferModal';
+import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { Bug, ArrowLeft } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
@@ -31,6 +32,9 @@ function App() {
     specimens,
     batches,
     stats,
+    setBoxes,
+    setSpecimens,
+    setBatches,
     addSpecimen,
     updateSpecimen,
     deleteSpecimen,
@@ -67,6 +71,7 @@ function App() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
+  const [backupRestoreModalOpen, setBackupRestoreModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -161,6 +166,7 @@ function App() {
         onOpenExport={() => setExportModalOpen(true)}
         onOpenImport={() => setImportModalOpen(true)}
         onOpenTransfer={() => setTransferModalOpen(true)}
+        onOpenBackupRestore={() => setBackupRestoreModalOpen(true)}
         onBackToMain={() => setViewMode('main')}
       />
 
@@ -304,6 +310,17 @@ function App() {
         onTransfer={(sourceBoxId, targetBoxId, specimenIds) => {
           transferSpecimens({ sourceBoxId, targetBoxId, specimenIds });
         }}
+      />
+
+      <BackupRestoreModal
+        isOpen={backupRestoreModalOpen}
+        onClose={() => setBackupRestoreModalOpen(false)}
+        boxes={boxes}
+        specimens={specimens}
+        batches={batches}
+        setBoxes={setBoxes}
+        setSpecimens={setSpecimens}
+        setBatches={setBatches}
       />
     </div>
   );

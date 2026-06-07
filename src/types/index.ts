@@ -95,3 +95,75 @@ export interface ImportPreviewData {
   invalidCount: number;
   totalCount: number;
 }
+
+export const BACKUP_FILE_VERSION = 1;
+
+export interface BackupFileData {
+  version: number;
+  exportedAt: string;
+  appName: string;
+  data: {
+    boxes: Box[];
+    specimens: Specimen[];
+    batches: CollectionBatch[];
+  };
+  stats: {
+    boxCount: number;
+    specimenCount: number;
+    batchCount: number;
+  };
+}
+
+export interface RestoreCompatibilityCheck {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+  versionMatch: boolean;
+  canRestore: boolean;
+}
+
+export interface RestorePreviewData {
+  backupData: BackupFileData;
+  compatibility: RestoreCompatibilityCheck;
+  currentStats: {
+    boxCount: number;
+    specimenCount: number;
+    batchCount: number;
+  };
+  conflicts: {
+    boxIdConflicts: string[];
+    specimenIdConflicts: string[];
+    batchIdConflicts: string[];
+    specimenNoConflicts: string[];
+    missingBoxReferences: string[];
+    missingBatchReferences: string[];
+  };
+  idMappingPlan: {
+    boxIdMap: Record<string, string>;
+    specimenIdMap: Record<string, string>;
+    batchIdMap: Record<string, string>;
+  };
+}
+
+export type RestoreMode = 'overwrite' | 'merge';
+
+export interface RestoreOptions {
+  mode: RestoreMode;
+  importBoxes: boolean;
+  importSpecimens: boolean;
+  importBatches: boolean;
+}
+
+export interface RestoreResult {
+  success: boolean;
+  message: string;
+  stats: {
+    boxesAdded: number;
+    boxesUpdated: number;
+    specimensAdded: number;
+    specimensUpdated: number;
+    batchesAdded: number;
+    batchesUpdated: number;
+    skippedDueToMissingRefs: number;
+  };
+}

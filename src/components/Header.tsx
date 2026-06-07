@@ -1,4 +1,4 @@
-import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight, Database } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
 
@@ -12,6 +12,7 @@ interface HeaderProps {
   onOpenExport: () => void;
   onOpenImport: () => void;
   onOpenTransfer: () => void;
+  onOpenBackupRestore: () => void;
   onBackToMain: () => void;
 }
 
@@ -25,6 +26,7 @@ export function Header({
   onOpenExport,
   onOpenImport,
   onOpenTransfer,
+  onOpenBackupRestore,
   onBackToMain,
 }: HeaderProps) {
   return (
@@ -91,6 +93,14 @@ export function Header({
                 >
                   <Upload className="w-4 h-4" />
                   <span className="hidden sm:inline">导入数据</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenBackupRestore}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Database className="w-4 h-4" />
+                  <span className="hidden sm:inline">备份恢复</span>
                 </button>
                 <button
                   type="button"
