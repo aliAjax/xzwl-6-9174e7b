@@ -10,6 +10,7 @@ import { BoxModal } from './components/BoxModal';
 import { BatchModal } from './components/BatchModal';
 import { SpecimenNoGenerator } from './components/SpecimenNoGenerator';
 import { PhotographyTaskList } from './components/PhotographyTaskList';
+import { ExportModal } from './components/ExportModal';
 import { Bug, ArrowLeft } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
@@ -60,6 +61,7 @@ function App() {
   const [boxModalOpen, setBoxModalOpen] = useState(false);
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -151,6 +153,7 @@ function App() {
         onManageBatches={() => setBatchModalOpen(true)}
         onOpenGenerator={() => setGeneratorOpen(true)}
         onOpenPhotography={() => setViewMode('photography')}
+        onOpenExport={() => setExportModalOpen(true)}
         onBackToMain={() => setViewMode('main')}
       />
 
@@ -266,6 +269,13 @@ function App() {
         boxes={boxes}
         checkSpecimenNoExists={checkSpecimenNoExists}
         addSpecimensBatch={addSpecimensBatch}
+      />
+
+      <ExportModal
+        isOpen={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        specimens={specimens}
+        boxes={boxes}
       />
     </div>
   );
