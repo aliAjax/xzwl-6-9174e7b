@@ -63,6 +63,16 @@ export function useSpecimens() {
     );
   }, [setSpecimens]);
 
+  const markPhotographed = useCallback((ids: string[], photographed: boolean = true) => {
+    const now = new Date().toISOString();
+    const idSet = new Set(ids);
+    setSpecimens(prev =>
+      prev.map(s =>
+        idSet.has(s.id) ? { ...s, photographed, updatedAt: now } : s
+      )
+    );
+  }, [setSpecimens]);
+
   const togglePinned = useCallback((id: string) => {
     const now = new Date().toISOString();
     setSpecimens(prev =>
@@ -161,6 +171,7 @@ export function useSpecimens() {
     updateSpecimen,
     deleteSpecimen,
     togglePhotographed,
+    markPhotographed,
     togglePinned,
     addBox,
     updateBox,

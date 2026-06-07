@@ -9,7 +9,10 @@ import { SpecimenModal } from './components/SpecimenModal';
 import { BoxModal } from './components/BoxModal';
 import { BatchModal } from './components/BatchModal';
 import { SpecimenNoGenerator } from './components/SpecimenNoGenerator';
-import { Bug } from 'lucide-react';
+import { PhotographyTaskList } from './components/PhotographyTaskList';
+import { Bug, ArrowLeft } from 'lucide-react';
+
+type ViewMode = 'main' | 'photography';
 
 const UNASSIGNED_BOX: Box = {
   id: '',
@@ -29,6 +32,7 @@ function App() {
     updateSpecimen,
     deleteSpecimen,
     togglePhotographed,
+    markPhotographed,
     togglePinned,
     addBox,
     updateBox,
@@ -41,6 +45,8 @@ function App() {
     checkSpecimenNoExists,
     addSpecimensBatch,
   } = useSpecimens();
+
+  const [viewMode, setViewMode] = useState<ViewMode>('main');
 
   const [filters, setFilters] = useState<Filters>({
     search: '',
@@ -139,58 +145,81 @@ function App() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header
+        viewMode={viewMode}
         onAddSpecimen={handleAddSpecimenClick}
         onManageBoxes={() => setBoxModalOpen(true)}
         onManageBatches={() => setBatchModalOpen(true)}
         onOpenGenerator={() => setGeneratorOpen(true)}
+        onOpenPhotography={() => setViewMode('photography')}
+        onBackToMain={() => setViewMode('main')}
       />
 
       <main className="flex-1 container px-4 py-6 md:py-8">
-        <div className="space-y-6">
-          <StatsCard stats={stats} />
+        {viewMode === 'photography' ? (
+          <div className="space-y-6">
+            <button
+              type="button"
+              onClick={() => setViewMode('main')}
+              className="flex items-center gap-2 text-oak-600 hover:text-oak-800 font-medium transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              返回标本列表
+            </button>
+            <PhotographyTaskList
+              specimens={specimens}
+              boxes={boxes}
+              batches={batches}
+              onTogglePhotographed={togglePhotographed}
+              onMarkPhotographed={(ids) => markPhotographed(ids, true)}
+            />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <StatsCard stats={stats} />
 
-          <FilterBar
-            filters={filters}
-            onFiltersChange={setFilters}
-            boxes={boxes}
-            batches={batches}
-          />
+            <FilterBar
+              filters={filters}
+              onFiltersChange={setFilters}
+              boxes={boxes}
+              batches={batches}
+            />
 
-          {!hasFilteredResults && filteredSpecimens.length === 0 ? (
-            <div className="card p-12 text-center">
-              <Bug className="w-16 h-16 text-oak-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-oak-700 font-serif mb-2">
-                未找到匹配的标本
-              </h3>
-              <p className="text-oak-500 mb-4">
-                请尝试调整筛选条件，或添加新的标本记录
-              </p>
-              <button
-                type="button"
-                onClick={handleAddSpecimenClick}
-                className="btn-primary"
-              >
-                添加第一件标本
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {boxesToShow.map((box, index) => (
-                <BoxGroup
-                  key={box.id}
-                  box={box}
-                  specimens={getSpecimensForBox(box.id)}
-                  batches={batches}
-                  onSpecimenClick={handleSpecimenClick}
-                  onTogglePhotographed={togglePhotographed}
-                  onTogglePinned={togglePinned}
-                  onDeleteSpecimen={handleDeleteSpecimen}
-                  index={index}
-                />
-              ))}
-            </div>
-          )}
-        </div>
+            {!hasFilteredResults && filteredSpecimens.length === 0 ? (
+              <div className="card p-12 text-center">
+                <Bug className="w-16 h-16 text-oak-300 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-oak-700 font-serif mb-2">
+                  未找到匹配的标本
+                </h3>
+                <p className="text-oak-500 mb-4">
+                  请尝试调整筛选条件，或添加新的标本记录
+                </p>
+                <button
+                  type="button"
+                  onClick={handleAddSpecimenClick}
+                  className="btn-primary"
+                >
+                  添加第一件标本
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {boxesToShow.map((box, index) => (
+                  <BoxGroup
+                    key={box.id}
+                    box={box}
+                    specimens={getSpecimensForBox(box.id)}
+                    batches={batches}
+                    onSpecimenClick={handleSpecimenClick}
+                    onTogglePhotographed={togglePhotographed}
+                    onTogglePinned={togglePinned}
+                    onDeleteSpecimen={handleDeleteSpecimen}
+                    index={index}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </main>
 
       <footer className="border-t border-oak-200 bg-parchment-50 py-4 mt-8">

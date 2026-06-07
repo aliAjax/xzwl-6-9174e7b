@@ -1,13 +1,26 @@
-import { Bug, Plus, Package, ClipboardList, Hash } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft } from 'lucide-react';
+
+type ViewMode = 'main' | 'photography';
 
 interface HeaderProps {
+  viewMode: ViewMode;
   onAddSpecimen: () => void;
   onManageBoxes: () => void;
   onManageBatches: () => void;
   onOpenGenerator: () => void;
+  onOpenPhotography: () => void;
+  onBackToMain: () => void;
 }
 
-export function Header({ onAddSpecimen, onManageBoxes, onManageBatches, onOpenGenerator }: HeaderProps) {
+export function Header({
+  viewMode,
+  onAddSpecimen,
+  onManageBoxes,
+  onManageBatches,
+  onOpenGenerator,
+  onOpenPhotography,
+  onBackToMain,
+}: HeaderProps) {
   return (
     <header className="bg-oak-800 text-parchment-50 shadow-lg sticky top-0 z-40">
       <div className="container px-4 py-4">
@@ -22,38 +35,59 @@ export function Header({ onAddSpecimen, onManageBoxes, onManageBatches, onOpenGe
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={onManageBoxes}
-              className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
-            >
-              <Package className="w-4 h-4" />
-              <span className="hidden sm:inline">展盒管理</span>
-            </button>
-            <button
-              type="button"
-              onClick={onManageBatches}
-              className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
-            >
-              <ClipboardList className="w-4 h-4" />
-              <span className="hidden sm:inline">批次管理</span>
-            </button>
-            <button
-              type="button"
-              onClick={onOpenGenerator}
-              className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
-            >
-              <Hash className="w-4 h-4" />
-              <span className="hidden sm:inline">编号生成</span>
-            </button>
-            <button
-              type="button"
-              onClick={onAddSpecimen}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <span>添加标本</span>
-            </button>
+            {viewMode === 'photography' ? (
+              <button
+                type="button"
+                onClick={onBackToMain}
+                className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span className="hidden sm:inline">返回列表</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={onManageBoxes}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Package className="w-4 h-4" />
+                  <span className="hidden sm:inline">展盒管理</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onManageBatches}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <ClipboardList className="w-4 h-4" />
+                  <span className="hidden sm:inline">批次管理</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenGenerator}
+                  className="flex items-center gap-2 px-4 py-2 bg-oak-700 hover:bg-oak-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Hash className="w-4 h-4" />
+                  <span className="hidden sm:inline">编号生成</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenPhotography}
+                  className="flex items-center gap-2 px-4 py-2 bg-rust-600 hover:bg-rust-700 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <Camera className="w-4 h-4" />
+                  <span className="hidden sm:inline">拍照任务</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onAddSpecimen}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>添加标本</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
