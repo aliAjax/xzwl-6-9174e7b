@@ -124,7 +124,7 @@ export function BoxTransferModal({
 
   const canTransfer = selectedSpecimenIds.size > 0 &&
     sourceBoxId !== targetBoxId &&
-    (targetBoxId || targetBoxId === '');
+    targetBoxId !== '';
 
   if (!isOpen) return null;
 
