@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Download, FileSpreadsheet } from 'lucide-react';
-import type { Box, Specimen } from '../types';
+import { X, Download, FileSpreadsheet, Filter } from 'lucide-react';
+import type { Box, Specimen, Filters, CollectionBatch } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { generateSpecimenCsv, downloadCsv, formatDate, type ExportSpecimenData } from '../utils/helpers';
 
 interface ExportModalProps {
@@ -8,11 +9,14 @@ interface ExportModalProps {
   onClose: () => void;
   specimens: Specimen[];
   boxes: Box[];
+  batches: CollectionBatch[];
+  filters: Filters;
+  filteredSpecimens: Specimen[];
 }
 
-type ExportType = 'all' | 'unphotographed' | 'box';
+type ExportType = 'all' | 'unphotographed' | 'box' | 'filtered';
 
-export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalProps) {
+export function ExportModal({ isOpen, onClose, specimens, boxes, batches, filters, filteredSpecimens }: ExportModalProps) {
   const [exportType, setExportType] = useState<ExportType>('all');
   const [selectedBoxId, setSelectedBoxId] = useState<string>('');
   const [error, setError] = useState('');
@@ -24,6 +28,49 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
       setError('');
     }
   }, [isOpen]);
+
+  const hasActiveFilters = useMemo(() => {
+    return (
+      filters.search !== '' ||
+      filters.onlyUnphotographed ||
+      filters.boxId !== '' ||
+      filters.batchId !== '' ||
+      filters.complianceStatus !== '' ||
+      filters.onlyHighRisk
+    );
+  }, [filters]);
+
+  const filterSummary = useMemo(() => {
+    const items: string[] = [];
+
+    if (filters.search) {
+      items.push(`搜索: "${filters.search}"`);
+    }
+    if (filters.onlyUnphotographed) {
+      items.push('未拍照');
+    }
+    if (filters.boxId) {
+      if (filters.boxId === '__unassigned__') {
+        items.push('展盒: 未分配');
+      } else {
+        const box = boxes.find((b) => b.id === filters.boxId);
+        items.push(`展盒: ${box ? box.name : '未知'}`);
+      }
+    }
+    if (filters.batchId) {
+      const batch = batches.find((b) => b.id === filters.batchId);
+      items.push(`批次: ${batch ? batch.name : '未知'}`);
+    }
+    if (filters.complianceStatus) {
+      const option = COMPLIANCE_STATUS_OPTIONS.find((o) => o.value === filters.complianceStatus);
+      items.push(`合规: ${option ? option.label : filters.complianceStatus}`);
+    }
+    if (filters.onlyHighRisk) {
+      items.push('高风险');
+    }
+
+    return items;
+  }, [filters, boxes, batches]);
 
   const exportData = useMemo((): ExportSpecimenData[] => {
     const getBoxName = (boxId: string): string => {
@@ -42,6 +89,8 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
       } else {
         filtered = filtered.filter((s) => s.boxId === selectedBoxId);
       }
+    } else if (exportType === 'filtered') {
+      filtered = [...filteredSpecimens];
     }
 
     return filtered.map((s) => {
@@ -62,7 +111,7 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
         complianceNotes: sAny.complianceNotes ?? '',
       };
     });
-  }, [specimens, boxes, exportType, selectedBoxId]);
+  }, [specimens, boxes, exportType, selectedBoxId, filteredSpecimens]);
 
   const previewCount = exportData.length;
 
@@ -90,6 +139,8 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
       } else if (exportType === 'box') {
         const boxName = getBoxName(selectedBoxId);
         filename = `${boxName}_标本_${today}`;
+      } else if (exportType === 'filtered') {
+        filename = `筛选结果_${today}`;
       }
 
       downloadCsv(csvContent, `${filename}.csv`);
@@ -144,6 +195,42 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
               </div>
 
               <div className="space-y-3">
+                {hasActiveFilters && (
+                  <label className="flex items-center gap-3 p-3 border-2 border-rust-300 bg-rust-50 rounded-lg cursor-pointer hover:bg-rust-100 transition-colors">
+                    <input
+                      type="radio"
+                      name="exportType"
+                      checked={exportType === 'filtered'}
+                      onChange={() => setExportType('filtered')}
+                      className="w-4 h-4 text-rust-600"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Filter className="w-4 h-4 text-rust-600" />
+                        <p className="font-medium text-oak-800">导出当前筛选结果</p>
+                      </div>
+                      <p className="text-sm text-oak-500">
+                        共 {filteredSpecimens.length} 件符合筛选条件
+                      </p>
+                      {exportType === 'filtered' && filterSummary.length > 0 && (
+                        <div className="mt-2 p-2 bg-oak-50 rounded-lg border border-oak-200">
+                          <p className="text-xs text-oak-600 font-medium mb-1">当前筛选条件:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {filterSummary.map((item, index) => (
+                              <span
+                                key={index}
+                                className="inline-block px-2 py-0.5 bg-oak-100 text-oak-700 text-xs rounded"
+                              >
+                                {item}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </label>
+                )}
+
                 <label className="flex items-center gap-3 p-3 border border-oak-200 rounded-lg cursor-pointer hover:bg-oak-100 transition-colors">
                   <input
                     type="radio"

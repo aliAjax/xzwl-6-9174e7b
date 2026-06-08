@@ -308,6 +308,9 @@ function App() {
         onClose={() => setExportModalOpen(false)}
         specimens={specimens}
         boxes={boxes}
+        batches={batches}
+        filters={filters}
+        filteredSpecimens={filteredSpecimens}
       />
 
       <ImportPreviewModal
