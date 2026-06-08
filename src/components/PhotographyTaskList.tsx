@@ -643,197 +643,214 @@ export function PhotographyTaskList({
     );
   };
 
+  const renderSessionModal = () => (
+    <PhotographySessionModal
+      isOpen={sessionModalOpen}
+      onClose={() => setSessionModalOpen(false)}
+      onSubmit={handleSessionSubmit}
+      editingSession={editingSession}
+      availableTargets={getAvailableTargets()}
+      getSpecimensForTargets={getSpecimensForTargets}
+    />
+  );
+
   if (viewMode === 'sessionDetail' && selectedSession) {
     const sessionProgress = getSessionProgress(selectedSession.id);
     const sessionPriorityInfo = PRIORITY_OPTIONS.find(opt => opt.value === selectedSession.priority);
 
     return (
-      <div className="space-y-6">
-        <div className="card p-6 animate-fade-in-up">
-          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <button
-                type="button"
-                onClick={handleBackToSessions}
-                className="mt-1 text-oak-500 hover:text-oak-700 transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-              <div>
-                <div className="flex items-center gap-3 flex-wrap mb-2">
-                  <h2 className="text-xl font-semibold text-oak-800 font-serif">{selectedSession.name}</h2>
-                  {sessionPriorityInfo && (
-                    <span className={`tag ${sessionPriorityInfo.bgColor} ${sessionPriorityInfo.color} border ${sessionPriorityInfo.borderColor} flex items-center gap-1`}>
-                      <Flag className="w-3 h-3" />
-                      {sessionPriorityInfo.label}
+      <>
+        <div className="space-y-6">
+          <div className="card p-6 animate-fade-in-up">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <button
+                  type="button"
+                  onClick={handleBackToSessions}
+                  className="mt-1 text-oak-500 hover:text-oak-700 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <div>
+                  <div className="flex items-center gap-3 flex-wrap mb-2">
+                    <h2 className="text-xl font-semibold text-oak-800 font-serif">{selectedSession.name}</h2>
+                    {sessionPriorityInfo && (
+                      <span className={`tag ${sessionPriorityInfo.bgColor} ${sessionPriorityInfo.color} border ${sessionPriorityInfo.borderColor} flex items-center gap-1`}>
+                        <Flag className="w-3 h-3" />
+                        {sessionPriorityInfo.label}
+                      </span>
+                    )}
+                    <span className={`tag ${selectedSession.status === 'active' ? 'bg-moss-100 text-moss-700' : selectedSession.status === 'completed' ? 'bg-oak-100 text-oak-700' : 'bg-red-100 text-red-700'}`}>
+                      {selectedSession.status === 'active' ? '进行中' : selectedSession.status === 'completed' ? '已完成' : '已取消'}
                     </span>
-                  )}
-                  <span className={`tag ${selectedSession.status === 'active' ? 'bg-moss-100 text-moss-700' : selectedSession.status === 'completed' ? 'bg-oak-100 text-oak-700' : 'bg-red-100 text-red-700'}`}>
-                    {selectedSession.status === 'active' ? '进行中' : selectedSession.status === 'completed' ? '已完成' : '已取消'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-4 text-sm text-oak-500 flex-wrap">
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    预计: {formatDate(selectedSession.scheduledDate)}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    创建: {formatDate(selectedSession.createdAt)}
-                  </span>
-                </div>
-                {selectedSession.notes && (
-                  <p className="text-sm text-oak-600 mt-2 flex items-center gap-1">
-                    <StickyNote className="w-4 h-4 text-oak-400" />
-                    <span className="italic">"{selectedSession.notes}"</span>
-                  </p>
-                )}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-sm mb-1">
-                    <span className="text-oak-600">
-                      进度: {sessionProgress.completed}/{sessionProgress.total} 件
-                    </span>
-                    <span className="font-medium text-oak-700">{sessionProgress.percentage}%</span>
                   </div>
-                  <div className="h-2 bg-oak-100 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-moss-500 to-moss-600 rounded-full transition-all duration-500"
-                      style={{ width: `${sessionProgress.percentage}%` }}
-                    />
+                  <div className="flex items-center gap-4 text-sm text-oak-500 flex-wrap">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-4 h-4" />
+                      预计: {formatDate(selectedSession.scheduledDate)}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-4 h-4" />
+                      创建: {formatDate(selectedSession.createdAt)}
+                    </span>
+                  </div>
+                  {selectedSession.notes && (
+                    <p className="text-sm text-oak-600 mt-2 flex items-center gap-1">
+                      <StickyNote className="w-4 h-4 text-oak-400" />
+                      <span className="italic">"{selectedSession.notes}"</span>
+                    </p>
+                  )}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-oak-600">
+                        进度: {sessionProgress.completed}/{sessionProgress.total} 件
+                      </span>
+                      <span className="font-medium text-oak-700">{sessionProgress.percentage}%</span>
+                    </div>
+                    <div className="h-2 bg-oak-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-moss-500 to-moss-600 rounded-full transition-all duration-500"
+                        style={{ width: `${sessionProgress.percentage}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                type="button"
-                onClick={() => onExportSession(selectedSession.id)}
-                className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" />
-                导出清单
-              </button>
-              {selectedSession.status === 'active' && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleEditSession(selectedSession)}
-                    className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    编辑
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm(`确定完成会话"${selectedSession.name}"吗？剩余 ${sessionDetailUnphotographed.length} 件未拍照的标本将被标记为已拍照。`)) {
-                        onCompleteSession(selectedSession.id);
-                      }
-                    }}
-                    className="bg-moss-600 hover:bg-moss-700 text-parchment-50 text-sm py-1.5 px-3 rounded-md flex items-center gap-1.5 transition-colors"
-                  >
-                    <CheckSquare className="w-3.5 h-3.5" />
-                    完成会话
-                  </button>
-                </>
-              )}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => onExportSession(selectedSession.id)}
+                  className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  导出清单
+                </button>
+                {selectedSession.status === 'active' && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleEditSession(selectedSession)}
+                      className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      编辑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`确定完成会话"${selectedSession.name}"吗？剩余 ${sessionDetailUnphotographed.length} 件未拍照的标本将被标记为已拍照。`)) {
+                          onCompleteSession(selectedSession.id);
+                        }
+                      }}
+                      className="bg-moss-600 hover:bg-moss-700 text-parchment-50 text-sm py-1.5 px-3 rounded-md flex items-center gap-1.5 transition-colors"
+                    >
+                      <CheckSquare className="w-3.5 h-3.5" />
+                      完成会话
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="card p-4 animate-fade-in-up">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-oak-800 font-serif">标本列表</h3>
-              <p className="text-sm text-oak-500 mt-1">
-                共 {sessionDetailSpecimens.length} 件 · 待拍照 {sessionDetailUnphotographed.length} 件
-              </p>
+          <div className="card p-4 animate-fade-in-up">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-oak-800 font-serif">标本列表</h3>
+                <p className="text-sm text-oak-500 mt-1">
+                  共 {sessionDetailSpecimens.length} 件 · 待拍照 {sessionDetailUnphotographed.length} 件
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const unphotographedIds = sessionDetailUnphotographed.map(s => s.id);
+                    if (selectedIds.size === unphotographedIds.length) {
+                      setSelectedIds(new Set());
+                    } else {
+                      setSelectedIds(new Set(unphotographedIds));
+                    }
+                  }}
+                  className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+                >
+                  {selectedIds.size === sessionDetailUnphotographed.length ? '取消全选' : '全选待拍'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleMarkSelected}
+                  disabled={selectedIds.size === 0}
+                  className={`btn-primary flex items-center gap-2 text-sm py-1.5 px-3 ${selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <Check className="w-4 h-4" />
+                  标记选中为已拍照
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  const unphotographedIds = sessionDetailUnphotographed.map(s => s.id);
-                  if (selectedIds.size === unphotographedIds.length) {
-                    setSelectedIds(new Set());
-                  } else {
-                    setSelectedIds(new Set(unphotographedIds));
-                  }
-                }}
-                className="text-sm text-oak-600 hover:text-oak-800 font-medium"
-              >
-                {selectedIds.size === sessionDetailUnphotographed.length ? '取消全选' : '全选待拍'}
-              </button>
-              <button
-                type="button"
-                onClick={handleMarkSelected}
-                disabled={selectedIds.size === 0}
-                className={`btn-primary flex items-center gap-2 text-sm py-1.5 px-3 ${selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Check className="w-4 h-4" />
-                标记选中为已拍照
-              </button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {sessionDetailSpecimens.map((specimen, idx) => renderSpecimenCard(specimen, idx, true))}
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {sessionDetailSpecimens.map((specimen, idx) => renderSpecimenCard(specimen, idx, true))}
           </div>
         </div>
-      </div>
+        {renderSessionModal()}
+      </>
     );
   }
 
   if (viewMode === 'sessions') {
     return (
-      <div className="space-y-6">
-        <div className="card p-6 animate-fade-in-up">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-moss-100 flex items-center justify-center">
-                <ClipboardList className="w-6 h-6 text-moss-600" />
+      <>
+        <div className="space-y-6">
+          <div className="card p-6 animate-fade-in-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-lg bg-moss-100 flex items-center justify-center">
+                  <ClipboardList className="w-6 h-6 text-moss-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-oak-800 font-serif">拍摄会话</h2>
+                  <p className="text-sm text-oak-500 mt-1">
+                    共 {sessions.length} 个会话 · 进行中 {activeSessions.length} 个
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-semibold text-oak-800 font-serif">拍摄会话</h2>
-                <p className="text-sm text-oak-500 mt-1">
-                  共 {sessions.length} 个会话 · 进行中 {activeSessions.length} 个
-                </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('groups')}
+                  className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+                >
+                  查看分组视图
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNewSession}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  新建会话
+                </button>
               </div>
-            </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setViewMode('groups')}
-                className="text-sm text-oak-600 hover:text-oak-800 font-medium"
-              >
-                查看分组视图
-              </button>
-              <button
-                type="button"
-                onClick={handleNewSession}
-                className="btn-primary flex items-center gap-2"
-              >
-                <Plus className="w-4 h-4" />
-                新建会话
-              </button>
             </div>
           </div>
-        </div>
 
-        <PhotographySessionList
-          sessions={sessions}
-          activeSessions={activeSessions}
-          completedSessions={completedSessions}
-          cancelledSessions={cancelledSessions}
-          getSessionProgress={getSessionProgress}
-          onViewSession={handleViewSession}
-          onEditSession={handleEditSession}
-          onExportSession={onExportSession}
-          onCompleteSession={onCompleteSession}
-          onCancelSession={onCancelSession}
-          onReactiveSession={onReactiveSession}
-          onDeleteSession={onDeleteSession}
-        />
-      </div>
+          <PhotographySessionList
+            sessions={sessions}
+            activeSessions={activeSessions}
+            completedSessions={completedSessions}
+            cancelledSessions={cancelledSessions}
+            getSessionProgress={getSessionProgress}
+            onViewSession={handleViewSession}
+            onEditSession={handleEditSession}
+            onExportSession={onExportSession}
+            onCompleteSession={onCompleteSession}
+            onCancelSession={onCancelSession}
+            onReactiveSession={onReactiveSession}
+            onDeleteSession={onDeleteSession}
+          />
+        </div>
+        {renderSessionModal()}
+      </>
     );
   }
 
@@ -1149,14 +1166,7 @@ export function PhotographyTaskList({
         </div>
       )}
 
-      <PhotographySessionModal
-        isOpen={sessionModalOpen}
-        onClose={() => setSessionModalOpen(false)}
-        onSubmit={handleSessionSubmit}
-        editingSession={editingSession}
-        availableTargets={getAvailableTargets()}
-        getSpecimensForTargets={getSpecimensForTargets}
-      />
+      {renderSessionModal()}
     </div>
   );
 }
