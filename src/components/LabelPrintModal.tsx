@@ -49,6 +49,8 @@ export function LabelPrintModal({
   const [boxFilter, setBoxFilter] = useState<string>('');
   const [fieldCheckResults, setFieldCheckResults] = useState<LabelFieldCheckResult[]>([]);
   const [showFieldCheck, setShowFieldCheck] = useState(false);
+  const [showFieldCompletionAlert, setShowFieldCompletionAlert] = useState(false);
+  const [pendingNextStep, setPendingNextStep] = useState<'settings' | 'preview' | null>(null);
   const [settings, setSettings] = useState<LabelPrintSettings>({
     templateType: 'pin',
     paperSize: 'A4',
@@ -153,6 +155,37 @@ export function LabelPrintModal({
     value: LabelPrintSettings[K]
   ) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleNextWithFieldCheck = (nextStep: 'settings' | 'preview') => {
+    if (invalidResults.length > 0) {
+      setPendingNextStep(nextStep);
+      setShowFieldCompletionAlert(true);
+    } else {
+      setStep(nextStep);
+    }
+  };
+
+  const handleSkipIncompleteSpecimens = () => {
+    const invalidSpecimenIds = new Set(invalidResults.map(r => r.specimenId));
+    setSelectedSpecimenIds(prev => {
+      const next = new Set(prev);
+      invalidSpecimenIds.forEach(id => next.delete(id));
+      return next;
+    });
+    setShowFieldCompletionAlert(false);
+    if (pendingNextStep) {
+      setStep(pendingNextStep);
+    }
+    setPendingNextStep(null);
+  };
+
+  const handleContinueWithIncomplete = () => {
+    setShowFieldCompletionAlert(false);
+    if (pendingNextStep) {
+      setStep(pendingNextStep);
+    }
+    setPendingNextStep(null);
   };
 
   const template = LABEL_TEMPLATES[settings.templateType];
@@ -623,6 +656,39 @@ export function LabelPrintModal({
 
           {step === 'preview' && (
             <div id="label-print-area" className="space-y-6">
+              <div className="bg-oak-100 border border-oak-300 rounded-xl p-4 mb-6 print:hidden">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-6">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-oak-800">{labelDataList.length}</div>
+                      <div className="text-sm text-oak-600">最终打印标签数</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-oak-800">{labelPages.length}</div>
+                      <div className="text-sm text-oak-600">总页数</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-oak-800">{labelsPerPage}</div>
+                      <div className="text-sm text-oak-600">每页标签数</div>
+                    </div>
+                    {invalidResults.length > 0 && (
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-rust-600">{invalidResults.length}</div>
+                        <div className="text-sm text-rust-600">字段缺失标本</div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-oak-600">
+                    已选 {selectedSpecimens.length} 件标本
+                    {invalidResults.length > 0 && (
+                      <span className="text-rust-600 ml-2">
+                        （{invalidResults.length} 件存在字段缺失，将打印不完整的标签）
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-center justify-between mb-4 print:hidden">
                 <div className="text-sm text-oak-600">
                   共 {labelPages.length} 页，{labelDataList.length} 个标签
@@ -703,7 +769,7 @@ export function LabelPrintModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep('settings')}
+                    onClick={() => handleNextWithFieldCheck('settings')}
                     disabled={selectedSpecimens.length === 0}
                     className={`btn-primary ${
                       selectedSpecimens.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
@@ -724,7 +790,7 @@ export function LabelPrintModal({
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep('preview')}
+                    onClick={() => handleNextWithFieldCheck('preview')}
                     className="btn-primary"
                   >
                     预览标签
@@ -746,7 +812,7 @@ export function LabelPrintModal({
                     className="btn-primary flex items-center gap-2"
                   >
                     <Printer className="w-4 h-4" />
-                    开始打印
+                    开始打印 {labelDataList.length} 张标签
                   </button>
                 </>
               )}
@@ -754,6 +820,113 @@ export function LabelPrintModal({
           </div>
         </div>
       </div>
+
+      {showFieldCompletionAlert && invalidResults.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="bg-parchment-50 rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col animate-fade-in">
+            <div className="flex items-center justify-between p-6 border-b border-oak-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-rust-100 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-rust-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-oak-800 font-serif">
+                    字段补全提醒
+                  </h3>
+                  <p className="text-sm text-oak-500">
+                    以下 {invalidResults.length} 件标本存在必填字段缺失
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowFieldCompletionAlert(false);
+                  setPendingNextStep(null);
+                }}
+                className="p-2 rounded-lg hover:bg-oak-100 text-oak-500 hover:text-oak-700 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="bg-rust-50 border border-rust-200 rounded-xl p-4 mb-4">
+                <h4 className="text-sm font-semibold text-rust-800 mb-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" />
+                  缺少以下必填字段的标本将无法打印完整标签：
+                </h4>
+                <p className="text-sm text-rust-700">
+                  采集地点、采集日期、展盒位置、物种名
+                </p>
+              </div>
+
+              <div className="space-y-2 max-h-[40vh] overflow-y-auto scrollbar-thin">
+                {invalidResults.map((result, idx) => (
+                  <div
+                    key={result.specimenId}
+                    className="flex items-center justify-between p-3 bg-rust-50 border border-rust-200 rounded-lg"
+                    style={{ animationDelay: `${idx * 0.02}s` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="inline-block px-2 py-0.5 bg-rust-100 text-rust-700 text-xs font-mono rounded">
+                        {result.specimenNo}
+                      </span>
+                      <span className="text-sm text-oak-700">
+                        {specimens.find(s => s.id === result.specimenId)?.species || '未知物种'}
+                      </span>
+                    </div>
+                    <div className="text-xs text-rust-600">
+                      缺少: {result.missingFields.join('、')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-oak-200 bg-oak-50">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm text-oak-600">
+                  已选择 <strong className="text-oak-800">{selectedSpecimens.length}</strong> 件标本，
+                  其中 <strong className="text-rust-600">{invalidResults.length}</strong> 件字段缺失
+                </div>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowFieldCompletionAlert(false);
+                      setPendingNextStep(null);
+                    }}
+                    className="btn-secondary"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSkipIncompleteSpecimens}
+                    className="flex items-center gap-2 px-4 py-2 bg-oak-200 text-oak-800 rounded-lg hover:bg-oak-300 transition-colors font-medium"
+                  >
+                    跳过缺字段标本
+                    <span className="text-xs">
+                      (打印 {selectedSpecimens.length - invalidResults.length} 张)
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleContinueWithIncomplete}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    继续打印
+                    <span className="text-xs opacity-80">
+                      (全部 {selectedSpecimens.length} 张)
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
