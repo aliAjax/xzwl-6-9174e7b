@@ -1,17 +1,20 @@
 import { useState, useCallback } from 'react';
-import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine } from 'lucide-react';
-import type { Box, Specimen, ImportPreviewData, SpecimenFormData } from '../types';
-import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData } from '../utils/helpers';
+import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine, Package, Layers, Plus, Info } from 'lucide-react';
+import type { Box, Specimen, CollectionBatch, ImportPreviewData, SpecimenFormData, BoxFormData, CollectionBatchFormData } from '../types';
+import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData, createBoxFormData, createBatchFormData } from '../utils/helpers';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
   specimens: Specimen[];
   boxes: Box[];
+  batches: CollectionBatch[];
   onImport: (data: SpecimenFormData[]) => void;
+  onCreateBox: (data: BoxFormData) => Box;
+  onCreateBatch: (data: CollectionBatchFormData) => CollectionBatch;
 }
 
-type Step = 'upload' | 'preview';
+type Step = 'upload' | 'preview' | 'confirm-objects';
 
 const DISPLAY_COLUMNS = [
   { key: 'specimenNo', label: '标本编号', required: true },
@@ -24,7 +27,7 @@ const DISPLAY_COLUMNS = [
   { key: 'notes', label: '备注', required: false },
 ];
 
-export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport }: ImportPreviewModalProps) {
+export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches, onImport, onCreateBox, onCreateBatch }: ImportPreviewModalProps) {
   const [step, setStep] = useState<Step>('upload');
   const [previewData, setPreviewData] = useState<ImportPreviewData | null>(null);
   const [error, setError] = useState('');
@@ -32,6 +35,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
   const [fileName, setFileName] = useState('');
   const [showOnlyInvalid, setShowOnlyInvalid] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [selectedBoxesToCreate, setSelectedBoxesToCreate] = useState<Set<string>>(new Set());
+  const [selectedBatchesToCreate, setSelectedBatchesToCreate] = useState<Set<string>>(new Set());
 
   const resetState = useCallback(() => {
     setStep('upload');
@@ -40,6 +45,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
     setFileName('');
     setShowOnlyInvalid(false);
     setIsImporting(false);
+    setSelectedBoxesToCreate(new Set());
+    setSelectedBatchesToCreate(new Set());
   }, []);
 
   const handleClose = () => {
@@ -57,14 +64,24 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
 
     try {
       const content = await readFileAsText(file);
-      const preview = validateAndPreviewCsv(content, specimens, boxes);
+      const preview = validateAndPreviewCsv(content, specimens, boxes, batches);
       setPreviewData(preview);
       setFileName(file.name);
-      setStep('preview');
+      
+      const newBoxes = preview.relatedObjects.newBoxes;
+      const newBatches = preview.relatedObjects.newBatches;
+      
+      if (newBoxes.length > 0 || newBatches.length > 0) {
+        setSelectedBoxesToCreate(new Set(newBoxes.map(b => b.name.toLowerCase())));
+        setSelectedBatchesToCreate(new Set(newBatches.map(b => b.name.toLowerCase())));
+        setStep('confirm-objects');
+      } else {
+        setStep('preview');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '文件解析失败，请检查CSV格式');
     }
-  }, [specimens, boxes]);
+  }, [specimens, boxes, batches]);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,17 +114,107 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
     setPreviewData(null);
   };
 
+  const handleConfirmObjects = () => {
+    setStep('preview');
+  };
+
+  const handleBackToConfirmObjects = () => {
+    if (previewData && (previewData.relatedObjects.newBoxes.length > 0 || previewData.relatedObjects.newBatches.length > 0)) {
+      setStep('confirm-objects');
+    } else {
+      setStep('upload');
+      setPreviewData(null);
+    }
+  };
+
+  const toggleBoxSelection = (boxName: string) => {
+    setSelectedBoxesToCreate(prev => {
+      const next = new Set(prev);
+      const lowerName = boxName.toLowerCase();
+      if (next.has(lowerName)) {
+        next.delete(lowerName);
+      } else {
+        next.add(lowerName);
+      }
+      return next;
+    });
+  };
+
+  const toggleBatchSelection = (batchName: string) => {
+    setSelectedBatchesToCreate(prev => {
+      const next = new Set(prev);
+      const lowerName = batchName.toLowerCase();
+      if (next.has(lowerName)) {
+        next.delete(lowerName);
+      } else {
+        next.add(lowerName);
+      }
+      return next;
+    });
+  };
+
   const handleImport = async () => {
     if (!previewData) return;
     
     setIsImporting(true);
     
     try {
+      const newBoxIdMap: Record<string, string> = {};
+      const newBatchIdMap: Record<string, string> = {};
+      
+      const { newBoxes, newBatches } = previewData.relatedObjects;
+      
+      for (const boxInfo of newBoxes) {
+        if (selectedBoxesToCreate.has(boxInfo.name.toLowerCase())) {
+          const boxData = createBoxFormData(boxInfo.name);
+          const newBox = onCreateBox(boxData);
+          newBoxIdMap[boxInfo.name.toLowerCase()] = newBox.id;
+        }
+      }
+      
+      for (const batchInfo of newBatches) {
+        if (selectedBatchesToCreate.has(batchInfo.name.toLowerCase())) {
+          const batchData = createBatchFormData(batchInfo.name);
+          const newBatch = onCreateBatch(batchData);
+          newBatchIdMap[batchInfo.name.toLowerCase()] = newBatch.id;
+        }
+      }
+      
       const validRows = previewData.rows.filter(r => r.isValid);
       const formDataList: SpecimenFormData[] = [];
       
+      const updatedBoxes = [...boxes];
+      const updatedBatches = [...batches];
+      
+      for (const [lowerName, id] of Object.entries(newBoxIdMap)) {
+        const boxInfo = newBoxes.find(b => b.name.toLowerCase() === lowerName);
+        if (boxInfo) {
+          updatedBoxes.push({ id, name: boxInfo.name, location: '', notes: 'CSV导入时自动创建', createdAt: new Date().toISOString() });
+        }
+      }
+      
+      for (const [lowerName, id] of Object.entries(newBatchIdMap)) {
+        const batchInfo = newBatches.find(b => b.name.toLowerCase() === lowerName);
+        if (batchInfo) {
+          updatedBatches.push({ id, name: batchInfo.name, collectionDate: '', location: '', participants: '', notes: 'CSV导入时自动创建', createdAt: new Date().toISOString() });
+        }
+      }
+      
       for (const row of validRows) {
-        const formData = convertToSpecimenFormData(row, boxes);
+        const hasUnselectedBox = row.data.boxName && 
+          !previewData.relatedObjects.existingBoxNames.has(row.data.boxName.toLowerCase()) &&
+          !selectedBoxesToCreate.has(row.data.boxName.toLowerCase());
+        
+        const hasUnselectedBatch = row.data.batchId && 
+          !previewData.relatedObjects.existingBatchIds.has(row.data.batchId) &&
+          !previewData.relatedObjects.existingBatchNames.has(row.data.batchId.toLowerCase()) &&
+          !selectedBatchesToCreate.has(row.data.batchId.toLowerCase());
+        
+        if (hasUnselectedBox || hasUnselectedBatch) {
+          continue;
+        }
+        
+        const formData = convertToSpecimenFormData(row, updatedBoxes, updatedBatches, newBoxIdMap, newBatchIdMap);
         if (formData) {
           formDataList.push(formData);
         }
@@ -151,14 +258,36 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
       case 'missing_required':
       case 'duplicate_no':
       case 'duplicate_no_in_file':
-      case 'box_not_found':
       case 'invalid_date':
       case 'invalid_boolean':
+      case 'invalid_compliance_status':
         return <XCircle className="w-4 h-4 text-rust-600" />;
+      case 'box_not_found':
+      case 'batch_not_found':
+        return <Info className="w-4 h-4 text-blue-600" />;
       default:
         return <AlertTriangle className="w-4 h-4 text-amber-600" />;
     }
   };
+
+  const getEffectiveValidCount = useCallback(() => {
+    if (!previewData) return 0;
+    
+    return previewData.rows.filter(row => {
+      if (!row.isValid) return false;
+      
+      const hasUnselectedBox = row.data.boxName && 
+        !previewData.relatedObjects.existingBoxNames.has(row.data.boxName.toLowerCase()) &&
+        !selectedBoxesToCreate.has(row.data.boxName.toLowerCase());
+      
+      const hasUnselectedBatch = row.data.batchId && 
+        !previewData.relatedObjects.existingBatchIds.has(row.data.batchId) &&
+        !previewData.relatedObjects.existingBatchNames.has(row.data.batchId.toLowerCase()) &&
+        !selectedBatchesToCreate.has(row.data.batchId.toLowerCase());
+      
+      return !hasUnselectedBox && !hasUnselectedBatch;
+    }).length;
+  }, [previewData, selectedBoxesToCreate, selectedBatchesToCreate]);
 
   const displayedRows = previewData 
     ? (showOnlyInvalid ? previewData.rows.filter(r => !r.isValid) : previewData.rows)
@@ -284,7 +413,14 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                     <span className="text-oak-400">·</span>
                     <div>
                       <span className="font-medium text-oak-800">展盒名称</span>
-                      <p className="text-oak-500 text-xs">需与系统中已有的展盒名称一致</p>
+                      <p className="text-oak-500 text-xs">不存在的展盒将在导入时自动创建</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-oak-400">·</span>
+                    <div>
+                      <span className="font-medium text-oak-800">采集批次</span>
+                      <p className="text-oak-500 text-xs">不存在的批次将在导入时自动创建</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-2">
@@ -308,6 +444,111 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        ) : step === 'confirm-objects' && previewData ? (
+          <div className="p-8 overflow-y-auto flex-1">
+            {error && (
+              <div className="mb-6 p-3 bg-rust-100 border border-rust-300 text-rust-800 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="max-w-3xl mx-auto">
+              <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-blue-800 mb-1">发现需要创建的关联对象</h4>
+                    <p className="text-sm text-blue-700">
+                      文件中包含系统中不存在的展盒和/或采集批次。请选择需要创建的对象，
+                      未选择的对象对应的标本记录将被跳过。
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {previewData.relatedObjects.newBoxes.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Package className="w-5 h-5 text-oak-600" />
+                    <h3 className="text-lg font-semibold text-oak-800 font-serif">需要创建的展盒</h3>
+                    <span className="text-sm text-oak-500">({previewData.relatedObjects.newBoxes.length} 个)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {previewData.relatedObjects.newBoxes.map((boxInfo) => (
+                      <label
+                        key={boxInfo.name}
+                        className="flex items-start gap-3 p-4 bg-parchment-100 border border-oak-200 rounded-lg cursor-pointer hover:bg-parchment-200 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBoxesToCreate.has(boxInfo.name.toLowerCase())}
+                          onChange={() => toggleBoxSelection(boxInfo.name)}
+                          className="w-4 h-4 mt-1 text-rust-600 rounded border-oak-300"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4 text-green-600" />
+                            <span className="font-medium text-oak-800">{boxInfo.name}</span>
+                          </div>
+                          <p className="text-xs text-oak-500 mt-1">
+                            应用于第 {boxInfo.rowIndices.join('、')} 行的记录
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {previewData.relatedObjects.newBatches.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Layers className="w-5 h-5 text-oak-600" />
+                    <h3 className="text-lg font-semibold text-oak-800 font-serif">需要创建的采集批次</h3>
+                    <span className="text-sm text-oak-500">({previewData.relatedObjects.newBatches.length} 个)</span>
+                  </div>
+                  <div className="space-y-2">
+                    {previewData.relatedObjects.newBatches.map((batchInfo) => (
+                      <label
+                        key={batchInfo.name}
+                        className="flex items-start gap-3 p-4 bg-parchment-100 border border-oak-200 rounded-lg cursor-pointer hover:bg-parchment-200 transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedBatchesToCreate.has(batchInfo.name.toLowerCase())}
+                          onChange={() => toggleBatchSelection(batchInfo.name)}
+                          className="w-4 h-4 mt-1 text-rust-600 rounded border-oak-300"
+                        />
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <Plus className="w-4 h-4 text-green-600" />
+                            <span className="font-medium text-oak-800">{batchInfo.name}</span>
+                          </div>
+                          <p className="text-xs text-oak-500 mt-1">
+                            应用于第 {batchInfo.rowIndices.join('、')} 行的记录
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h4 className="font-semibold text-amber-800 mb-1">说明</h4>
+                    <ul className="text-sm text-amber-700 space-y-1">
+                      <li>• 新创建的展盒位置、备注等信息可在"管理展盒"中补充完善</li>
+                      <li>• 新创建的采集批次日期、地点等信息可在"管理批次"中补充完善</li>
+                      <li>• 未勾选创建的对象对应的标本记录将不会被导入</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         ) : (
@@ -496,10 +737,6 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                             </li>
                             <li className="flex items-center gap-2">
                               <XCircle className="w-4 h-4" />
-                              <span>展盒名称在系统中不存在</span>
-                            </li>
-                            <li className="flex items-center gap-2">
-                              <XCircle className="w-4 h-4" />
                               <span>日期格式不正确</span>
                             </li>
                             <li className="flex items-center gap-2">
@@ -515,6 +752,40 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                       </div>
                     </div>
                   )}
+
+                  {(previewData.relatedObjects.newBoxes.length > 0 || previewData.relatedObjects.newBatches.length > 0) && (
+                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+                      <div className="flex items-start gap-3">
+                        <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <h4 className="font-semibold text-blue-800 mb-2">
+                            关联对象信息
+                          </h4>
+                          <ul className="text-sm text-blue-700 space-y-1">
+                            {previewData.relatedObjects.newBoxes.length > 0 && (
+                              <li className="flex items-center gap-2">
+                                <Package className="w-4 h-4" />
+                                <span>
+                                  将创建 <span className="font-semibold">{selectedBoxesToCreate.size}</span> / {previewData.relatedObjects.newBoxes.length} 个新展盒
+                                </span>
+                              </li>
+                            )}
+                            {previewData.relatedObjects.newBatches.length > 0 && (
+                              <li className="flex items-center gap-2">
+                                <Layers className="w-4 h-4" />
+                                <span>
+                                  将创建 <span className="font-semibold">{selectedBatchesToCreate.size}</span> / {previewData.relatedObjects.newBatches.length} 个新采集批次
+                                </span>
+                              </li>
+                            )}
+                          </ul>
+                          <p className="text-xs text-blue-600 mt-2">
+                            可点击"返回"按钮修改要创建的关联对象选择
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -525,12 +796,17 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
           <div>
             {step === 'preview' && previewData && (
               <span className="text-sm text-oak-500">
-                将导入 <span className="font-semibold text-green-700">{previewData.validCount}</span> 条有效记录
+                将导入 <span className="font-semibold text-green-700">{getEffectiveValidCount()}</span> 条有效记录
+              </span>
+            )}
+            {step === 'confirm-objects' && previewData && (
+              <span className="text-sm text-oak-500">
+                选择需要创建的关联对象
               </span>
             )}
           </div>
           <div className="flex items-center gap-3">
-            {step === 'preview' ? (
+            {step === 'confirm-objects' ? (
               <>
                 <button
                   type="button"
@@ -538,12 +814,31 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                   className="btn-secondary"
                   disabled={isImporting}
                 >
-                  重新选择文件
+                  取消
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmObjects}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  继续
+                </button>
+              </>
+            ) : step === 'preview' ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleBackToConfirmObjects}
+                  className="btn-secondary"
+                  disabled={isImporting}
+                >
+                  返回
                 </button>
                 <button
                   type="button"
                   onClick={handleImport}
-                  disabled={!previewData || previewData.validCount === 0 || isImporting}
+                  disabled={!previewData || getEffectiveValidCount() === 0 || isImporting}
                   className="btn-primary flex items-center gap-2"
                 >
                   {isImporting ? (
@@ -554,7 +849,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, onImport
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      确认导入 {previewData?.validCount || 0} 条
+                      确认导入 {getEffectiveValidCount()} 条
                     </>
                   )}
                 </button>

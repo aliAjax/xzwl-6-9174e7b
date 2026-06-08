@@ -108,9 +108,28 @@ export type ValidationErrorType =
   | 'duplicate_no' 
   | 'duplicate_no_in_file' 
   | 'box_not_found' 
+  | 'batch_not_found'
   | 'invalid_date' 
   | 'invalid_boolean'
   | 'invalid_compliance_status';
+
+export interface NewBoxInfo {
+  name: string;
+  rowIndices: number[];
+}
+
+export interface NewBatchInfo {
+  name: string;
+  rowIndices: number[];
+}
+
+export interface ImportRelatedObjects {
+  newBoxes: NewBoxInfo[];
+  newBatches: NewBatchInfo[];
+  existingBoxNames: Set<string>;
+  existingBatchNames: Set<string>;
+  existingBatchIds: Set<string>;
+}
 
 export interface ValidationError {
   rowIndex: number;
@@ -134,6 +153,7 @@ export interface ImportPreviewData {
   validCount: number;
   invalidCount: number;
   totalCount: number;
+  relatedObjects: ImportRelatedObjects;
 }
 
 export const BACKUP_FILE_VERSION = 2;

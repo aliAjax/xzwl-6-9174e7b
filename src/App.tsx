@@ -315,7 +315,10 @@ function App() {
         onClose={() => setImportModalOpen(false)}
         specimens={specimens}
         boxes={boxes}
+        batches={batches}
         onImport={addSpecimensBatch}
+        onCreateBox={addBox}
+        onCreateBatch={addBatch}
       />
 
       <BoxTransferModal

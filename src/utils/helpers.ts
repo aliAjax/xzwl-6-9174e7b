@@ -22,8 +22,11 @@ import type {
   MergeStrategy,
   MergeResult,
   MergeSnapshot,
+  NewBoxInfo,
+  NewBatchInfo,
+  ImportRelatedObjects,
 } from '../types';
-import type { Box, Specimen, CollectionBatch } from '../types';
+import type { Box, Specimen, CollectionBatch, BoxFormData, CollectionBatchFormData } from '../types';
 import { LABEL_FIELDS, COMPLIANCE_STATUS_OPTIONS, DEFAULT_COMPLIANCE_STATUS, BACKUP_FILE_VERSION } from '../types';
 
 export const generateId = (): string => {
@@ -352,7 +355,8 @@ const createError = (
 export const validateAndPreviewCsv = (
   csvContent: string,
   existingSpecimens: Specimen[],
-  existingBoxes: Box[]
+  existingBoxes: Box[],
+  existingBatches: CollectionBatch[]
 ): ImportPreviewData => {
   const parsedRows = parseCsv(csvContent);
 
@@ -366,7 +370,12 @@ export const validateAndPreviewCsv = (
 
   const existingSpecimenNos = new Set(existingSpecimens.map(s => s.specimenNo.toLowerCase()));
   const existingBoxNames = new Set(existingBoxes.map(b => b.name.toLowerCase()));
+  const existingBatchNames = new Set(existingBatches.map(b => b.name.toLowerCase()));
+  const existingBatchIds = new Set(existingBatches.map(b => b.id));
   const fileSpecimenNos = new Map<string, number[]>();
+
+  const newBoxMap = new Map<string, number[]>();
+  const newBatchMap = new Map<string, number[]>();
 
   const rows: ImportPreviewRow[] = dataRows.map((rowData, rowIdx) => {
     const actualRowIndex = rowIdx + 2;
@@ -449,21 +458,52 @@ export const validateAndPreviewCsv = (
         }
         case 'boxName':
           data.boxName = value.trim();
-          if (data.boxName && !existingBoxNames.has(data.boxName.toLowerCase())) {
-            errors.push(createError(
-              actualRowIndex,
-              '展盒名称',
-              'box_not_found',
-              `展盒 "${data.boxName}" 不存在，请先创建展盒`
-            ));
+          if (data.boxName) {
+            const lowerBoxName = data.boxName.toLowerCase();
+            if (!existingBoxNames.has(lowerBoxName)) {
+              warnings.push(createError(
+                actualRowIndex,
+                '展盒名称',
+                'box_not_found',
+                `展盒 "${data.boxName}" 将在导入时自动创建`
+              ));
+              if (!newBoxMap.has(lowerBoxName)) {
+                newBoxMap.set(lowerBoxName, []);
+              }
+              newBoxMap.get(lowerBoxName)!.push(actualRowIndex);
+            }
           }
           break;
         case 'notes':
           data.notes = value.trim();
           break;
-        case 'batchId':
-          data.batchId = value.trim();
+        case 'batchId': {
+          const batchValue = value.trim();
+          if (batchValue) {
+            const isExistingId = existingBatchIds.has(batchValue);
+            const lowerBatchName = batchValue.toLowerCase();
+            const isExistingName = existingBatchNames.has(lowerBatchName);
+
+            if (isExistingId || isExistingName) {
+              data.batchId = batchValue;
+            } else {
+              warnings.push(createError(
+                actualRowIndex,
+                '采集批次',
+                'batch_not_found',
+                `采集批次 "${batchValue}" 将在导入时自动创建`
+              ));
+              data.batchId = batchValue;
+              if (!newBatchMap.has(lowerBatchName)) {
+                newBatchMap.set(lowerBatchName, []);
+              }
+              newBatchMap.get(lowerBatchName)!.push(actualRowIndex);
+            }
+          } else {
+            data.batchId = '';
+          }
           break;
+        }
         case 'complianceStatus': {
           const statusValue = value.trim();
           if (statusValue) {
@@ -547,6 +587,26 @@ export const validateAndPreviewCsv = (
     }
   });
 
+  const newBoxes: NewBoxInfo[] = Array.from(newBoxMap.entries()).map(([lowerName, rowIndices]) => {
+    const firstRowWithBox = rows.find(r => r.data.boxName?.toLowerCase() === lowerName);
+    const displayName = firstRowWithBox?.data.boxName || lowerName;
+    return { name: displayName, rowIndices };
+  });
+
+  const newBatches: NewBatchInfo[] = Array.from(newBatchMap.entries()).map(([lowerName, rowIndices]) => {
+    const firstRowWithBatch = rows.find(r => r.data.batchId?.toLowerCase() === lowerName);
+    const displayName = firstRowWithBatch?.data.batchId || lowerName;
+    return { name: displayName, rowIndices };
+  });
+
+  const relatedObjects: ImportRelatedObjects = {
+    newBoxes,
+    newBatches,
+    existingBoxNames,
+    existingBatchNames,
+    existingBatchIds,
+  };
+
   const validCount = rows.filter(r => r.isValid).length;
   const invalidCount = rows.filter(r => !r.isValid).length;
 
@@ -557,21 +617,46 @@ export const validateAndPreviewCsv = (
     validCount,
     invalidCount,
     totalCount: rows.length,
+    relatedObjects,
   };
 };
 
 export const convertToSpecimenFormData = (
   previewRow: ImportPreviewRow,
-  boxes: Box[]
+  boxes: Box[],
+  batches: CollectionBatch[],
+  newBoxIdMap: Record<string, string> = {},
+  newBatchIdMap: Record<string, string> = {}
 ): SpecimenFormData | null => {
   if (!previewRow.isValid || !previewRow.data.specimenNo || !previewRow.data.species) {
     return null;
   }
 
   const { data } = previewRow;
-  const box = data.boxName
-    ? boxes.find(b => b.name.toLowerCase() === data.boxName!.toLowerCase())
-    : null;
+
+  let boxId = '';
+  if (data.boxName) {
+    const lowerBoxName = data.boxName.toLowerCase();
+    if (newBoxIdMap[lowerBoxName]) {
+      boxId = newBoxIdMap[lowerBoxName];
+    } else {
+      const box = boxes.find(b => b.name.toLowerCase() === lowerBoxName);
+      boxId = box?.id || '';
+    }
+  }
+
+  let batchId = '';
+  if (data.batchId) {
+    const lowerBatchName = data.batchId.toLowerCase();
+    if (newBatchIdMap[lowerBatchName]) {
+      batchId = newBatchIdMap[lowerBatchName];
+    } else if (batches.some(b => b.id === data.batchId)) {
+      batchId = data.batchId;
+    } else {
+      const batch = batches.find(b => b.name.toLowerCase() === lowerBatchName);
+      batchId = batch?.id || '';
+    }
+  }
 
   return {
     specimenNo: data.specimenNo,
@@ -580,8 +665,8 @@ export const convertToSpecimenFormData = (
     collectionDate: data.collectionDate || '',
     pinnedStatus: data.pinnedStatus ?? false,
     photographed: data.photographed ?? false,
-    boxId: box?.id || '',
-    batchId: data.batchId || '',
+    boxId,
+    batchId,
     notes: data.notes || '',
     complianceStatus: (data.complianceStatus as ComplianceStatus) ?? DEFAULT_COMPLIANCE_STATUS,
     permitNumber: data.permitNumber || '',
@@ -589,6 +674,20 @@ export const convertToSpecimenFormData = (
     complianceNotes: data.complianceNotes || '',
   };
 };
+
+export const createBoxFormData = (boxName: string): BoxFormData => ({
+  name: boxName,
+  location: '',
+  notes: 'CSV导入时自动创建',
+});
+
+export const createBatchFormData = (batchName: string): CollectionBatchFormData => ({
+  name: batchName,
+  collectionDate: '',
+  location: '',
+  participants: '',
+  notes: 'CSV导入时自动创建',
+});
 
 export const readFileAsText = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
