@@ -371,6 +371,16 @@ export interface MergeSnapshot {
   description?: string;
 }
 
+export type PhotographyGroupPriority = 'high' | 'medium' | 'low';
+
+export interface PhotographyGroupMetadata {
+  groupKey: string;
+  groupBy: string;
+  priority: PhotographyGroupPriority;
+  notes: string;
+  updatedAt: string;
+}
+
 export type BatchEditField = 'photographed' | 'pinnedStatus' | 'boxId' | 'batchId' | 'complianceStatus';
 
 export interface BatchEditData {

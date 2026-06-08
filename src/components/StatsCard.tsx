@@ -1,4 +1,4 @@
-import { Bug, Camera, Package, Clock, ClipboardList, AlertTriangle, Shield, AlertCircle } from 'lucide-react';
+import { Bug, Camera, Package, Clock, ClipboardList, AlertTriangle, Shield, AlertCircle, AlertOctagon } from 'lucide-react';
 
 interface StatsCardProps {
   stats: {
@@ -8,6 +8,7 @@ interface StatsCardProps {
     totalBoxes: number;
     totalBatches: number;
     highRiskCount: number;
+    highRiskUnphotographed: number;
     protectedCount: number;
     invasiveCount: number;
     permitExpiredCount: number;
@@ -59,6 +60,13 @@ export function StatsCard({ stats }: StatsCardProps) {
       bgColor: 'bg-amber-100',
     },
     {
+      label: '待拍照高风险',
+      value: stats.highRiskUnphotographed,
+      icon: AlertOctagon,
+      color: 'text-red-700',
+      bgColor: 'bg-red-100',
+    },
+    {
       label: '保护物种',
       value: stats.protectedCount,
       icon: Shield,
@@ -82,7 +90,7 @@ export function StatsCard({ stats }: StatsCardProps) {
   ];
 
   return (
-    <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-5 lg:grid-cols-5 gap-4">
       {statItems.map((item, index) => (
         <div
           key={item.label}

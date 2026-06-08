@@ -1,6 +1,31 @@
-import { useState, useMemo } from 'react';
-import { Package, MapPin, Camera, Check, ChevronDown, ChevronUp, Calendar, ClipboardList } from 'lucide-react';
-import type { Box, Specimen, CollectionBatch } from '../types';
+import { useState, useMemo, useCallback } from 'react';
+import {
+  Package,
+  MapPin,
+  Camera,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  ClipboardList,
+  AlertTriangle,
+  Flag,
+  StickyNote,
+  Edit3,
+  X,
+  AlertOctagon,
+  Layers,
+} from 'lucide-react';
+import type {
+  Box,
+  Specimen,
+  CollectionBatch,
+  PhotographyGroupMetadata,
+  PhotographyGroupPriority,
+  ComplianceStatus,
+} from '../types';
+import { HIGH_RISK_STATUSES, COMPLIANCE_STATUS_OPTIONS } from '../types';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 import { formatDate } from '../utils/helpers';
 
 interface PhotographyTaskListProps {
@@ -11,14 +36,33 @@ interface PhotographyTaskListProps {
   onMarkPhotographed: (ids: string[]) => void;
 }
 
-type GroupBy = 'box' | 'location';
+type GroupBy = 'box' | 'location' | 'batch' | 'highRisk' | 'unassignedBox';
 
 interface GroupItem {
   key: string;
   label: string;
   subtitle?: string;
   specimens: Specimen[];
+  icon: 'box' | 'location' | 'batch' | 'highRisk' | 'unassigned';
 }
+
+const GROUP_METADATA_KEY = 'photography_group_metadata';
+
+const PRIORITY_OPTIONS: {
+  value: PhotographyGroupPriority;
+  label: string;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}[] = [
+  { value: 'high', label: '高优先级', color: 'text-red-700', bgColor: 'bg-red-100', borderColor: 'border-red-300' },
+  { value: 'medium', label: '中优先级', color: 'text-amber-700', bgColor: 'bg-amber-100', borderColor: 'border-amber-300' },
+  { value: 'low', label: '低优先级', color: 'text-oak-600', bgColor: 'bg-oak-100', borderColor: 'border-oak-300' },
+];
+
+const getComplianceStatusInfo = (status: ComplianceStatus) => {
+  return COMPLIANCE_STATUS_OPTIONS.find(opt => opt.value === status) || COMPLIANCE_STATUS_OPTIONS[0];
+};
 
 export function PhotographyTaskList({
   specimens,
@@ -30,17 +74,71 @@ export function PhotographyTaskList({
   const [groupBy, setGroupBy] = useState<GroupBy>('box');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [groupMetadata, setGroupMetadata] = useLocalStorage<PhotographyGroupMetadata[]>(
+    GROUP_METADATA_KEY,
+    []
+  );
+  const [editingGroup, setEditingGroup] = useState<{ groupKey: string; groupBy: GroupBy } | null>(null);
+  const [editPriority, setEditPriority] = useState<PhotographyGroupPriority>('medium');
+  const [editNotes, setEditNotes] = useState('');
 
   const unphotographedSpecimens = useMemo(() => {
-    return specimens.filter(s => !s.photographed);
+    return specimens.filter((s) => !s.photographed);
   }, [specimens]);
+
+  const highRiskUnphotographedCount = useMemo(() => {
+    return unphotographedSpecimens.filter((s) =>
+      HIGH_RISK_STATUSES.includes(s.complianceStatus)
+    ).length;
+  }, [unphotographedSpecimens]);
+
+  const getGroupKey = (groupKey: string, groupByType: string): string => {
+    return `${groupByType}__${groupKey}`;
+  };
+
+  const getMetadata = useCallback(
+    (groupKey: string, groupByType: string): PhotographyGroupMetadata | undefined => {
+      const fullKey = getGroupKey(groupKey, groupByType);
+      return groupMetadata.find((m) => m.groupKey === fullKey && m.groupBy === groupByType);
+    },
+    [groupMetadata]
+  );
+
+  const updateMetadata = useCallback(
+    (groupKey: string, groupByType: string, priority: PhotographyGroupPriority, notes: string) => {
+      const fullKey = getGroupKey(groupKey, groupByType);
+      const now = new Date().toISOString();
+      setGroupMetadata((prev) => {
+        const existing = prev.find((m) => m.groupKey === fullKey && m.groupBy === groupByType);
+        if (existing) {
+          return prev.map((m) =>
+            m.groupKey === fullKey && m.groupBy === groupByType
+              ? { ...m, priority, notes, updatedAt: now }
+              : m
+          );
+        } else {
+          return [
+            ...prev,
+            {
+              groupKey: fullKey,
+              groupBy: groupByType,
+              priority,
+              notes,
+              updatedAt: now,
+            },
+          ];
+        }
+      });
+    },
+    [setGroupMetadata]
+  );
 
   const groups = useMemo((): GroupItem[] => {
     if (groupBy === 'box') {
       const grouped = new Map<string, Specimen[]>();
       const unassigned: Specimen[] = [];
 
-      unphotographedSpecimens.forEach(s => {
+      unphotographedSpecimens.forEach((s) => {
         if (s.boxId) {
           if (!grouped.has(s.boxId)) {
             grouped.set(s.boxId, []);
@@ -59,26 +157,28 @@ export function PhotographyTaskList({
           label: '未分配展盒',
           subtitle: '草稿标本',
           specimens: unassigned,
+          icon: 'unassigned',
         });
       }
 
-      boxes.forEach(box => {
+      boxes.forEach((box) => {
         if (grouped.has(box.id)) {
           result.push({
             key: box.id,
             label: box.name,
             subtitle: box.location,
             specimens: grouped.get(box.id)!,
+            icon: 'box',
           });
         }
       });
 
       return result;
-    } else {
+    } else if (groupBy === 'location') {
       const grouped = new Map<string, Specimen[]>();
       const unknown: Specimen[] = [];
 
-      unphotographedSpecimens.forEach(s => {
+      unphotographedSpecimens.forEach((s) => {
         const location = s.collectionLocation?.trim();
         if (location) {
           if (!grouped.has(location)) {
@@ -95,6 +195,7 @@ export function PhotographyTaskList({
         label: location,
         subtitle: `${specs.length} 件标本`,
         specimens: specs,
+        icon: 'location',
       }));
 
       if (unknown.length > 0) {
@@ -103,15 +204,137 @@ export function PhotographyTaskList({
           label: '未填写采集地点',
           subtitle: `${unknown.length} 件标本`,
           specimens: unknown,
+          icon: 'location',
         });
       }
 
       return result.sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'));
+    } else if (groupBy === 'batch') {
+      const grouped = new Map<string, Specimen[]>();
+      const noBatch: Specimen[] = [];
+
+      unphotographedSpecimens.forEach((s) => {
+        if (s.batchId) {
+          if (!grouped.has(s.batchId)) {
+            grouped.set(s.batchId, []);
+          }
+          grouped.get(s.batchId)!.push(s);
+        } else {
+          noBatch.push(s);
+        }
+      });
+
+      const result: GroupItem[] = [];
+
+      batches.forEach((batch) => {
+        if (grouped.has(batch.id)) {
+          result.push({
+            key: batch.id,
+            label: batch.name,
+            subtitle: `${formatDate(batch.collectionDate)} · ${batch.location}`,
+            specimens: grouped.get(batch.id)!,
+            icon: 'batch',
+          });
+        }
+      });
+
+      if (noBatch.length > 0) {
+        result.push({
+          key: '__no_batch__',
+          label: '未分配采集批次',
+          subtitle: '未关联采集批次的标本',
+          specimens: noBatch,
+          icon: 'batch',
+        });
+      }
+
+      return result;
+    } else if (groupBy === 'highRisk') {
+      const highRisk: Specimen[] = [];
+      const normal: Specimen[] = [];
+
+      unphotographedSpecimens.forEach((s) => {
+        if (HIGH_RISK_STATUSES.includes(s.complianceStatus)) {
+          highRisk.push(s);
+        } else {
+          normal.push(s);
+        }
+      });
+
+      const result: GroupItem[] = [];
+
+      if (highRisk.length > 0) {
+        result.push({
+          key: '__high_risk__',
+          label: '合规高风险',
+          subtitle: '保护物种、外来物种、许可过期或待确认',
+          specimens: highRisk,
+          icon: 'highRisk',
+        });
+      }
+
+      if (normal.length > 0) {
+        result.push({
+          key: '__normal_risk__',
+          label: '普通合规',
+          subtitle: '无需特殊许可的普通物种',
+          specimens: normal,
+          icon: 'highRisk',
+        });
+      }
+
+      return result;
+    } else if (groupBy === 'unassignedBox') {
+      const unassigned: Specimen[] = unphotographedSpecimens.filter((s) => !s.boxId);
+      const assigned: Specimen[] = unphotographedSpecimens.filter((s) => s.boxId);
+
+      const result: GroupItem[] = [];
+
+      if (unassigned.length > 0) {
+        result.push({
+          key: '__unassigned_box__',
+          label: '未分配展盒',
+          subtitle: '草稿标本，待整理',
+          specimens: unassigned,
+          icon: 'unassigned',
+        });
+      }
+
+      if (assigned.length > 0) {
+        result.push({
+          key: '__assigned_box__',
+          label: '已分配展盒',
+          subtitle: '已归入展盒的标本',
+          specimens: assigned,
+          icon: 'box',
+        });
+      }
+
+      return result;
     }
-  }, [unphotographedSpecimens, groupBy, boxes]);
+
+    return [];
+  }, [unphotographedSpecimens, groupBy, boxes, batches]);
+
+  const groupsSorted = useMemo(() => {
+    return [...groups].sort((a, b) => {
+      const metaA = getMetadata(a.key, groupBy);
+      const metaB = getMetadata(b.key, groupBy);
+
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const orderA = metaA ? priorityOrder[metaA.priority] : 1;
+      const orderB = metaB ? priorityOrder[metaB.priority] : 1;
+
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+
+      return a.label.localeCompare(b.label, 'zh-CN');
+    });
+  }, [groups, groupBy, getMetadata]);
 
   const toggleGroup = (key: string) => {
-    setExpandedGroups(prev => {
+    setExpandedGroups((prev) => {
       const next = new Set(prev);
       if (next.has(key)) {
         next.delete(key);
@@ -123,7 +346,7 @@ export function PhotographyTaskList({
   };
 
   const toggleSelectSpecimen = (id: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -135,10 +358,10 @@ export function PhotographyTaskList({
   };
 
   const toggleSelectGroup = (specimens: Specimen[]) => {
-    const allSelected = specimens.every(s => selectedIds.has(s.id));
-    setSelectedIds(prev => {
+    const allSelected = specimens.every((s) => selectedIds.has(s.id));
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      specimens.forEach(s => {
+      specimens.forEach((s) => {
         if (allSelected) {
           next.delete(s.id);
         } else {
@@ -153,7 +376,7 @@ export function PhotographyTaskList({
     if (selectedIds.size === unphotographedSpecimens.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(unphotographedSpecimens.map(s => s.id)));
+      setSelectedIds(new Set(unphotographedSpecimens.map((s) => s.id)));
     }
   };
 
@@ -167,23 +390,65 @@ export function PhotographyTaskList({
 
   const handleMarkGroup = (specimens: Specimen[]) => {
     if (confirm(`确定将本组 ${specimens.length} 件标本全部标记为已拍照吗？`)) {
-      onMarkPhotographed(specimens.map(s => s.id));
+      onMarkPhotographed(specimens.map((s) => s.id));
     }
   };
 
-  const getBoxById = (id: string) => boxes.find(b => b.id === id);
-  const getBatchById = (id: string) => batches.find(b => b.id === id);
+  const handleOpenEditModal = (groupKey: string, groupByType: GroupBy) => {
+    const metadata = getMetadata(groupKey, groupByType);
+    setEditingGroup({ groupKey, groupBy: groupByType });
+    setEditPriority(metadata?.priority || 'medium');
+    setEditNotes(metadata?.notes || '');
+  };
+
+  const handleSaveMetadata = () => {
+    if (!editingGroup) return;
+    updateMetadata(editingGroup.groupKey, editingGroup.groupBy, editPriority, editNotes);
+    setEditingGroup(null);
+  };
+
+  const handleCloseEditModal = () => {
+    setEditingGroup(null);
+  };
+
+  const getBoxById = (id: string) => boxes.find((b) => b.id === id);
+  const getBatchById = (id: string) => batches.find((b) => b.id === id);
+
+  const getGroupIcon = (iconType: GroupItem['icon']) => {
+    switch (iconType) {
+      case 'box':
+        return <Package className="w-5 h-5 text-oak-700" />;
+      case 'location':
+        return <MapPin className="w-5 h-5 text-oak-700" />;
+      case 'batch':
+        return <ClipboardList className="w-5 h-5 text-moss-600" />;
+      case 'highRisk':
+        return <AlertTriangle className="w-5 h-5 text-amber-600" />;
+      case 'unassigned':
+        return <Layers className="w-5 h-5 text-oak-500" />;
+    }
+  };
+
+  const getPriorityBadge = (priority?: PhotographyGroupPriority) => {
+    if (!priority) return null;
+    const option = PRIORITY_OPTIONS.find((opt) => opt.value === priority);
+    if (!option) return null;
+    return (
+      <span
+        className={`tag ${option.bgColor} ${option.color} border ${option.borderColor} flex items-center gap-1`}
+      >
+        <Flag className="w-3 h-3" />
+        {option.label}
+      </span>
+    );
+  };
 
   if (unphotographedSpecimens.length === 0) {
     return (
       <div className="card p-16 text-center animate-fade-in-up">
         <Camera className="w-20 h-20 text-moss-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-oak-700 font-serif mb-2">
-          太棒了！所有标本都已拍照
-        </h3>
-        <p className="text-oak-500">
-          暂无待拍照的标本任务
-        </p>
+        <h3 className="text-xl font-semibold text-oak-700 font-serif mb-2">太棒了！所有标本都已拍照</h3>
+        <p className="text-oak-500">暂无待拍照的标本任务</p>
       </div>
     );
   }
@@ -197,26 +462,30 @@ export function PhotographyTaskList({
               <Camera className="w-6 h-6 text-rust-600" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-oak-800 font-serif">
-                拍照任务清单
-              </h2>
-              <p className="text-sm text-oak-500">
-                共 <span className="font-semibold text-rust-600">{unphotographedSpecimens.length}</span> 件标本待拍照
-              </p>
+              <h2 className="text-xl font-semibold text-oak-800 font-serif">拍照工作台</h2>
+              <div className="flex items-center gap-3 mt-1">
+                <p className="text-sm text-oak-500">
+                  共{' '}
+                  <span className="font-semibold text-rust-600">{unphotographedSpecimens.length}</span>{' '}
+                  件标本待拍照
+                </p>
+                {highRiskUnphotographedCount > 0 && (
+                  <span className="text-sm text-red-600 font-medium flex items-center gap-1">
+                    <AlertOctagon className="w-4 h-4" />
+                    其中 <span className="font-bold">{highRiskUnphotographedCount}</span> 件为高风险
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <span className="text-sm text-oak-600">分组方式：</span>
-              <div className="flex rounded-md overflow-hidden border border-oak-300">
+              <div className="flex flex-wrap rounded-md overflow-hidden border border-oak-300">
                 <button
                   type="button"
                   onClick={() => setGroupBy('box')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
-                    groupBy === 'box'
-                      ? 'bg-oak-700 text-parchment-50'
-                      : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${groupBy === 'box' ? 'bg-oak-700 text-parchment-50' : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'}`}
                 >
                   <Package className="w-3.5 h-3.5" />
                   按展盒
@@ -224,14 +493,34 @@ export function PhotographyTaskList({
                 <button
                   type="button"
                   onClick={() => setGroupBy('location')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${
-                    groupBy === 'location'
-                      ? 'bg-oak-700 text-parchment-50'
-                      : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'
-                  }`}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${groupBy === 'location' ? 'bg-oak-700 text-parchment-50' : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'}`}
                 >
                   <MapPin className="w-3.5 h-3.5" />
                   按地点
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('batch')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${groupBy === 'batch' ? 'bg-oak-700 text-parchment-50' : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'}`}
+                >
+                  <ClipboardList className="w-3.5 h-3.5" />
+                  按批次
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('highRisk')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${groupBy === 'highRisk' ? 'bg-oak-700 text-parchment-50' : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'}`}
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  按高风险
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupBy('unassignedBox')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium transition-colors ${groupBy === 'unassignedBox' ? 'bg-oak-700 text-parchment-50' : 'bg-parchment-50 text-oak-600 hover:bg-oak-100'}`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  未分配展盒
                 </button>
               </div>
             </div>
@@ -246,22 +535,23 @@ export function PhotographyTaskList({
               type="button"
               onClick={handleMarkSelected}
               disabled={selectedIds.size === 0}
-              className={`btn-primary flex items-center gap-2 ${
-                selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed' : ''
-              }`}
+              className={`btn-primary flex items-center gap-2 ${selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               <Check className="w-4 h-4" />
-              {selectedIds.size > 0 ? `标记 ${selectedIds.size} 件为已拍照` : '标记选中为已拍照'}
+              {selectedIds.size > 0
+                ? `标记 ${selectedIds.size} 件为已拍照`
+                : '标记选中为已拍照'}
             </button>
           </div>
         </div>
       </div>
 
       <div className="space-y-6">
-        {groups.map((group, groupIndex) => {
+        {groupsSorted.map((group, groupIndex) => {
           const isExpanded = expandedGroups.has(group.key);
-          const allInGroupSelected = group.specimens.every(s => selectedIds.has(s.id));
-          const someInGroupSelected = group.specimens.some(s => selectedIds.has(s.id));
+          const allInGroupSelected = group.specimens.every((s) => selectedIds.has(s.id));
+          const someInGroupSelected = group.specimens.some((s) => selectedIds.has(s.id));
+          const metadata = getMetadata(group.key, groupBy);
 
           return (
             <section
@@ -275,28 +565,40 @@ export function PhotographyTaskList({
                   onClick={() => toggleGroup(group.key)}
                 >
                   <div className="w-10 h-10 rounded-lg bg-oak-100 flex items-center justify-center flex-shrink-0">
-                    {groupBy === 'box' ? (
-                      <Package className="w-5 h-5 text-oak-700" />
-                    ) : (
-                      <MapPin className="w-5 h-5 text-oak-700" />
-                    )}
+                    {getGroupIcon(group.icon)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                       <h3 className="text-lg font-semibold text-oak-800 font-serif decorative-underline">
                         {group.label}
                       </h3>
                       <span className="tag bg-rust-100 text-rust-700">
                         {group.specimens.length} 件待拍照
                       </span>
+                      {metadata && getPriorityBadge(metadata.priority)}
                     </div>
                     {group.subtitle && (
-                      <p className="text-sm text-oak-500 mt-1">
-                        {group.subtitle}
+                      <p className="text-sm text-oak-500 mt-1">{group.subtitle}</p>
+                    )}
+                    {metadata?.notes && (
+                      <p className="text-sm text-oak-600 mt-1 flex items-center gap-1">
+                        <StickyNote className="w-3.5 h-3.5 text-oak-400" />
+                        <span className="italic">"{metadata.notes}"</span>
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEditModal(group.key, groupBy);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-oak-600 hover:text-oak-800 hover:bg-oak-100 rounded-md transition-colors"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">设置</span>
+                    </button>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -306,20 +608,19 @@ export function PhotographyTaskList({
                       className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-oak-600 hover:text-oak-800 hover:bg-oak-100 rounded-md transition-colors"
                     >
                       <div
-                        className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                          allInGroupSelected
+                        className={`w-4 h-4 rounded border-2 flex items-center justify-center ${allInGroupSelected
                             ? 'bg-oak-700 border-oak-700'
                             : someInGroupSelected
                             ? 'border-oak-400'
                             : 'border-oak-300'
-                        }`}
+                          }`}
                       >
                         {allInGroupSelected && <Check className="w-3 h-3 text-parchment-50" />}
                         {someInGroupSelected && !allInGroupSelected && (
                           <div className="w-2 h-0.5 bg-oak-500" />
                         )}
                       </div>
-                      本组全选
+                      <span className="hidden sm:inline">本组全选</span>
                     </button>
                     <button
                       type="button"
@@ -330,7 +631,7 @@ export function PhotographyTaskList({
                       className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
                     >
                       <Camera className="w-3.5 h-3.5" />
-                      全部标记
+                      <span className="hidden sm:inline">全部标记</span>
                     </button>
                     {isExpanded ? (
                       <ChevronUp className="w-5 h-5 text-oak-400" />
@@ -347,13 +648,13 @@ export function PhotographyTaskList({
                         const isSelected = selectedIds.has(specimen.id);
                         const box = specimen.boxId ? getBoxById(specimen.boxId) : null;
                         const batch = specimen.batchId ? getBatchById(specimen.batchId) : null;
+                        const complianceInfo = getComplianceStatusInfo(specimen.complianceStatus);
+                        const isHighRisk = HIGH_RISK_STATUSES.includes(specimen.complianceStatus);
 
                         return (
                           <div
                             key={specimen.id}
-                            className={`card p-4 opacity-0 animate-fade-in-up ${
-                              isSelected ? 'ring-2 ring-oak-500' : ''
-                            }`}
+                            className={`card p-4 opacity-0 animate-fade-in-up ${isSelected ? 'ring-2 ring-oak-500' : ''} ${isHighRisk ? 'border-l-4 border-l-red-400' : ''}`}
                             style={{ animationDelay: `${idx * 0.03}s` }}
                           >
                             <div className="flex items-start gap-3">
@@ -363,11 +664,10 @@ export function PhotographyTaskList({
                                 className="mt-1 flex-shrink-0"
                               >
                                 <div
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                                    isSelected
+                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected
                                       ? 'bg-oak-700 border-oak-700'
                                       : 'border-oak-300 hover:border-oak-500'
-                                  }`}
+                                    }`}
                                 >
                                   {isSelected && (
                                     <Check className="w-3.5 h-3.5 text-parchment-500" />
@@ -375,10 +675,17 @@ export function PhotographyTaskList({
                                 </div>
                               </button>
                               <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-2">
+                                <div className="flex items-center gap-2 mb-2 flex-wrap">
                                   <span className="inline-block px-2 py-1 bg-oak-100 text-oak-700 text-xs font-mono rounded">
                                     {specimen.specimenNo}
                                   </span>
+                                  {isHighRisk && (
+                                    <span
+                                      className={`inline-block px-2 py-1 text-xs font-medium rounded ${complianceInfo.bgColor} ${complianceInfo.color}`}
+                                    >
+                                      {complianceInfo.label}
+                                    </span>
+                                  )}
                                 </div>
                                 <h4 className="font-semibold text-oak-900 font-serif leading-tight mb-2">
                                   {specimen.species || (
@@ -398,13 +705,13 @@ export function PhotographyTaskList({
                                     <Calendar className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
                                     <span>{formatDate(specimen.collectionDate)}</span>
                                   </div>
-                                  {box && groupBy !== 'box' && (
+                                  {box && groupBy !== 'box' && groupBy !== 'unassignedBox' && (
                                     <div className="flex items-center gap-1.5">
                                       <Package className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
                                       <span className="truncate">{box.name}</span>
                                     </div>
                                   )}
-                                  {batch && (
+                                  {batch && groupBy !== 'batch' && (
                                     <div className="flex items-center gap-1.5">
                                       <ClipboardList className="w-3.5 h-3.5 text-moss-500 flex-shrink-0" />
                                       <span className="truncate font-medium text-moss-700">
@@ -441,6 +748,74 @@ export function PhotographyTaskList({
           );
         })}
       </div>
+
+      {editingGroup && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-parchment-50 rounded-lg shadow-xl max-w-md w-full p-6 animate-fade-in-up">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-oak-800 font-serif">分组设置</h3>
+              <button
+                type="button"
+                onClick={handleCloseEditModal}
+                className="text-oak-400 hover:text-oak-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-oak-700 mb-2">
+                  临时优先级
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {PRIORITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setEditPriority(option.value)}
+                      className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium border transition-all ${editPriority === option.value
+                          ? `${option.bgColor} ${option.color} ${option.borderColor} border-2 ring-2 ring-offset-1`
+                          : 'bg-parchment-50 text-oak-600 border border-oak-200 hover:bg-oak-50'
+                        }`}
+                    >
+                      <Flag className="w-3.5 h-3.5" />
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-oak-700 mb-2">
+                  备注
+                </label>
+                <textarea
+                  value={editNotes}
+                  onChange={(e) => setEditNotes(e.target.value)}
+                  placeholder="添加临时备注，仅用于拍照工作组织..."
+                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-oak-900 placeholder-oak-400 focus:outline-none focus:ring-2 focus:ring-oak-500 focus:border-transparent resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                type="button"
+                onClick={handleCloseEditModal}
+                className="px-4 py-2 text-oak-600 hover:text-oak-800 font-medium"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveMetadata}
+                className="btn-primary"
+              >
+                保存设置
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

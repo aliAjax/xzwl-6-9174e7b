@@ -196,6 +196,7 @@ export function useSpecimens() {
     totalBoxes: boxes.length,
     totalBatches: batches.length,
     highRiskCount: specimens.filter(s => HIGH_RISK_STATUSES.includes(s.complianceStatus)).length,
+    highRiskUnphotographed: specimens.filter(s => HIGH_RISK_STATUSES.includes(s.complianceStatus) && !s.photographed).length,
     protectedCount: specimens.filter(s => s.complianceStatus === 'protected_species').length,
     invasiveCount: specimens.filter(s => s.complianceStatus === 'invasive_species').length,
     permitExpiredCount: specimens.filter(s => s.complianceStatus === 'expired_permit').length,
