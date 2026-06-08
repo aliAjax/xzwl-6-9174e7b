@@ -164,9 +164,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
       return;
     }
     
-    const headerIdx = previewData.headers.findIndex(h => 
-      previewData.fieldMapping[h] === fieldKey
-    );
+    const headerIdx = getLastHeaderIndexForField(fieldKey);
     
     if (headerIdx === -1) {
       setEditingCell(null);
@@ -184,6 +182,34 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     
     triggerRevalidation(previewData.fieldMapping, newRawRows);
     setEditingCell(null);
+  };
+
+  const getDuplicateMappings = (): Record<string, string[]> => {
+    if (!previewData) return {};
+    const fieldToHeaders: Record<string, string[]> = {};
+    previewData.headers.forEach(h => {
+      const field = previewData.fieldMapping[h];
+      if (field !== null) {
+        if (!fieldToHeaders[field]) {
+          fieldToHeaders[field] = [];
+        }
+        fieldToHeaders[field].push(h);
+      }
+    });
+    const duplicates: Record<string, string[]> = {};
+    Object.entries(fieldToHeaders).forEach(([field, headers]) => {
+      if (headers.length > 1) {
+        duplicates[field] = headers;
+      }
+    });
+    return duplicates;
+  };
+
+  const isFieldAlreadyMapped = (field: keyof CsvRowData | 'boxName' | null, currentHeader: string): boolean => {
+    if (!previewData || field === null) return false;
+    return previewData.headers.some(h => 
+      h !== currentHeader && previewData.fieldMapping[h] === field
+    );
   };
 
   const handleCellEditCancel = () => {
@@ -350,14 +376,23 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     return value?.toString() || '';
   };
 
+  const getLastHeaderIndexForField = (fieldKey: string): number => {
+    if (!previewData) return -1;
+    let lastIdx = -1;
+    previewData.headers.forEach((h, idx) => {
+      if (previewData.fieldMapping[h] === fieldKey) {
+        lastIdx = idx;
+      }
+    });
+    return lastIdx;
+  };
+
   const getFieldRawValue = (row: ImportPreviewData['rows'][0], key: string): string => {
     if (!previewData) return '';
     const dataRowIdx = row.rowIndex - 2;
     if (dataRowIdx < 0 || dataRowIdx >= previewData.rawRows.length) return '';
     
-    const headerIdx = previewData.headers.findIndex(h => 
-      previewData.fieldMapping[h] === key
-    );
+    const headerIdx = getLastHeaderIndexForField(key);
     if (headerIdx === -1) return '';
     
     return previewData.rawRows[dataRowIdx][headerIdx] || '';
@@ -424,25 +459,63 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
   const renderFieldMappingDropdown = (header: string) => {
     if (!previewData) return null;
     const currentMapping = previewData.fieldMapping[header];
-    
+    const duplicates = getDuplicateMappings();
+    const isCurrentDuplicate = currentMapping !== null && duplicates[currentMapping]?.includes(header);
+    const duplicateHeaders = currentMapping !== null ? duplicates[currentMapping] : [];
+    const isLastOccurrence = currentMapping !== null && 
+      duplicateHeaders.length > 0 && 
+      duplicateHeaders[duplicateHeaders.length - 1] === header;
+
     return (
       <div className="relative">
         <select
           value={currentMapping === null ? '' : currentMapping}
           onChange={(e) => {
             const value = e.target.value;
-            handleFieldMappingChange(header, value === '' ? null : value as keyof CsvRowData | 'boxName');
+            const newField = value === '' ? null : value as keyof CsvRowData | 'boxName';
+            
+            if (newField !== null && isFieldAlreadyMapped(newField, header)) {
+              const confirmed = window.confirm(
+                `字段 "${ALL_TARGET_FIELDS.find(f => f.key === newField)?.label || newField}" ` +
+                `已被映射到其他列。\n\n如果继续，该字段将有多个数据源，` +
+                `实际导入时将使用最后一列的值。\n\n是否确认继续？`
+              );
+              if (!confirmed) {
+                e.target.value = currentMapping === null ? '' : currentMapping;
+                return;
+              }
+            }
+            
+            handleFieldMappingChange(header, newField);
           }}
-          className="w-full px-2 py-1.5 text-xs border border-oak-300 rounded-md bg-parchment-50 text-oak-800 focus:outline-none focus:ring-2 focus:ring-rust-500 focus:border-transparent appearance-none pr-8"
+          className={`w-full px-2 py-1.5 text-xs border rounded-md bg-parchment-50 text-oak-800 focus:outline-none focus:ring-2 focus:ring-rust-500 focus:border-transparent appearance-none pr-8 ${
+            isCurrentDuplicate ? 'border-amber-400 bg-amber-50' : 'border-oak-300'
+          }`}
         >
-          {ALL_TARGET_FIELDS.map(field => (
-            <option key={field.key === null ? 'null' : field.key} value={field.key === null ? '' : field.key}>
-              {field.label}
-              {field.required && ' *'}
-            </option>
-          ))}
+          {ALL_TARGET_FIELDS.map(field => {
+            const isMappedElsewhere = field.key !== null && 
+              field.key !== currentMapping && 
+              isFieldAlreadyMapped(field.key, header);
+            return (
+              <option 
+                key={field.key === null ? 'null' : field.key} 
+                value={field.key === null ? '' : field.key}
+                disabled={isMappedElsewhere}
+              >
+                {field.label}
+                {field.required && ' *'}
+                {isMappedElsewhere && ' (已映射)'}
+              </option>
+            );
+          })}
         </select>
         <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-oak-500 pointer-events-none" />
+        {isCurrentDuplicate && (
+          <div className="mt-1 text-[10px] text-amber-700 flex items-center gap-1" title={`该字段也被映射到：${duplicateHeaders.filter(h => h !== header).join('、')}${isLastOccurrence ? '。当前列为最后一列，其值将在导入时使用。' : ''}`}>
+            <AlertTriangle className="w-3 h-3" />
+            {isLastOccurrence ? '重复映射（当前列生效）' : '重复映射（被覆盖）'}
+          </div>
+        )}
       </div>
     );
   };
@@ -847,6 +920,41 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                     </div>
                     {showFieldMapping && (
                       <div className="bg-parchment-100 border border-oak-200 rounded-lg p-4">
+                        {Object.keys(getDuplicateMappings()).length > 0 && (
+                          <div className="mb-4 p-3 bg-amber-50 border border-amber-300 rounded-lg">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <h4 className="text-sm font-semibold text-amber-800 mb-1">检测到重复字段映射</h4>
+                                <p className="text-xs text-amber-700 mb-2">
+                                  以下字段被映射到了多个CSV列。实际导入时，每字段将使用<strong>最后一列</strong>的值：
+                                </p>
+                                <ul className="text-xs text-amber-700 space-y-1">
+                                  {Object.entries(getDuplicateMappings()).map(([field, headers]) => {
+                                    const fieldInfo = ALL_TARGET_FIELDS.find(f => f.key === field);
+                                    const lastHeader = headers[headers.length - 1];
+                                    return (
+                                      <li key={field} className="flex items-center gap-2">
+                                        <span className="font-medium">{fieldInfo?.label || field}:</span>
+                                        <span>{headers.map((h, idx) => (
+                                          <span key={h}>
+                                            {idx > 0 && ' → '}
+                                            <span className={h === lastHeader ? 'font-semibold text-amber-800' : ''}>
+                                              "{h}"{h === lastHeader && ' (生效)'}
+                                            </span>
+                                          </span>
+                                        ))}</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                                <p className="text-xs text-amber-600 mt-2">
+                                  建议：将不需要的列映射改为"— 忽略此列 —"以避免数据不一致。
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                           {previewData.headers.map((header) => {
                             const mappedField = previewData.fieldMapping[header];
