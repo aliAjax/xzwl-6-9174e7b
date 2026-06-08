@@ -103,15 +103,15 @@ export function useSpecimens() {
     const now = new Date().toISOString();
     const idSet = new Set(ids);
     const dataEntries = Object.entries(data) as [keyof BatchEditData, unknown][];
-    
+
     setSpecimens(prev =>
       prev.map(s => {
         if (!idSet.has(s.id)) return s;
-        
+
         const hasChanges = dataEntries.some(([key, value]) => s[key] !== value);
-        
+
         if (!hasChanges) return s;
-        
+
         return { ...s, ...data, updatedAt: now };
       })
     );
