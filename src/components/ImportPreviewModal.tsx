@@ -78,7 +78,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const processFile = useCallback(async (file: File) => {
     setError('');
-    
+
     if (!file.name.toLowerCase().endsWith('.csv')) {
       setError('请上传CSV格式的文件');
       return;
@@ -89,10 +89,10 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
       const preview = validateAndPreviewCsv(content, specimens, boxes, batches);
       setPreviewData(preview);
       setFileName(file.name);
-      
+
       const newBoxes = preview.relatedObjects.newBoxes;
       const newBatches = preview.relatedObjects.newBatches;
-      
+
       if (newBoxes.length > 0 || newBatches.length > 0) {
         setSelectedBoxesToCreate(new Set(newBoxes.map(b => b.name.toLowerCase())));
         setSelectedBatchesToCreate(new Set(newBatches.map(b => b.name.toLowerCase())));
@@ -120,15 +120,15 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const handleFieldMappingChange = (header: string, newTargetField: keyof CsvRowData | 'boxName' | null) => {
     if (!previewData) return;
-    
+
     const newMapping = { ...previewData.fieldMapping };
     newMapping[header] = newTargetField;
-    
+
     const newPreview = triggerRevalidation(newMapping, previewData.rawRows);
-    
+
     const newBoxes = newPreview.relatedObjects.newBoxes;
     const newBatches = newPreview.relatedObjects.newBatches;
-    
+
     if (newBoxes.length > 0) {
       setSelectedBoxesToCreate(prev => {
         const next = new Set(prev);
@@ -155,22 +155,22 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const handleCellEditSave = () => {
     if (!editingCell || !previewData) return;
-    
+
     const { rowIndex, fieldKey, value } = editingCell;
     const dataRowIdx = rowIndex - 2;
-    
+
     if (dataRowIdx < 0 || dataRowIdx >= previewData.rawRows.length) {
       setEditingCell(null);
       return;
     }
-    
+
     const headerIdx = getLastHeaderIndexForField(fieldKey);
-    
+
     if (headerIdx === -1) {
       setEditingCell(null);
       return;
     }
-    
+
     const newRawRows = previewData.rawRows.map((row, idx) => {
       if (idx === dataRowIdx) {
         const newRow = [...row];
@@ -179,7 +179,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
       }
       return row;
     });
-    
+
     triggerRevalidation(previewData.fieldMapping, newRawRows);
     setEditingCell(null);
   };
@@ -207,7 +207,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const isFieldAlreadyMapped = (field: keyof CsvRowData | 'boxName' | null, currentHeader: string): boolean => {
     if (!previewData || field === null) return false;
-    return previewData.headers.some(h => 
+    return previewData.headers.some(h =>
       h !== currentHeader && previewData.fieldMapping[h] === field
     );
   };
@@ -288,15 +288,15 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const handleImport = async () => {
     if (!previewData) return;
-    
+
     setIsImporting(true);
-    
+
     try {
       const newBoxIdMap: Record<string, string> = {};
       const newBatchIdMap: Record<string, string> = {};
-      
+
       const { newBoxes, newBatches } = previewData.relatedObjects;
-      
+
       for (const boxInfo of newBoxes) {
         if (selectedBoxesToCreate.has(boxInfo.name.toLowerCase())) {
           const boxData = createBoxFormData(boxInfo.name);
@@ -304,7 +304,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
           newBoxIdMap[boxInfo.name.toLowerCase()] = newBox.id;
         }
       }
-      
+
       for (const batchInfo of newBatches) {
         if (selectedBatchesToCreate.has(batchInfo.name.toLowerCase())) {
           const batchData = createBatchFormData(batchInfo.name);
@@ -312,41 +312,41 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
           newBatchIdMap[batchInfo.name.toLowerCase()] = newBatch.id;
         }
       }
-      
+
       const validRows = previewData.rows.filter(r => r.isValid);
       const formDataList: SpecimenFormData[] = [];
-      
+
       const updatedBoxes = [...boxes];
       const updatedBatches = [...batches];
-      
+
       for (const [lowerName, id] of Object.entries(newBoxIdMap)) {
         const boxInfo = newBoxes.find(b => b.name.toLowerCase() === lowerName);
         if (boxInfo) {
           updatedBoxes.push({ id, name: boxInfo.name, location: '', notes: 'CSV导入时自动创建', createdAt: new Date().toISOString() });
         }
       }
-      
+
       for (const [lowerName, id] of Object.entries(newBatchIdMap)) {
         const batchInfo = newBatches.find(b => b.name.toLowerCase() === lowerName);
         if (batchInfo) {
           updatedBatches.push({ id, name: batchInfo.name, collectionDate: '', location: '', participants: '', notes: 'CSV导入时自动创建', createdAt: new Date().toISOString() });
         }
       }
-      
+
       for (const row of validRows) {
-        const hasUnselectedBox = row.data.boxName && 
+        const hasUnselectedBox = row.data.boxName &&
           !previewData.relatedObjects.existingBoxNames.has(row.data.boxName.toLowerCase()) &&
           !selectedBoxesToCreate.has(row.data.boxName.toLowerCase());
-        
-        const hasUnselectedBatch = row.data.batchId && 
+
+        const hasUnselectedBatch = row.data.batchId &&
           !previewData.relatedObjects.existingBatchIds.has(row.data.batchId) &&
           !previewData.relatedObjects.existingBatchNames.has(row.data.batchId.toLowerCase()) &&
           !selectedBatchesToCreate.has(row.data.batchId.toLowerCase());
-        
+
         if (hasUnselectedBox || hasUnselectedBatch) {
           continue;
         }
-        
+
         const formData = convertToSpecimenFormData(row, updatedBoxes, updatedBatches, newBoxIdMap, newBatchIdMap);
         if (formData) {
           formDataList.push(formData);
@@ -356,7 +356,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
       if (formDataList.length > 0) {
         onImport(formDataList);
       }
-      
+
       handleClose();
     } catch (e) {
       setError(e instanceof Error ? e.message : '导入失败');
@@ -391,10 +391,10 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     if (!previewData) return '';
     const dataRowIdx = row.rowIndex - 2;
     if (dataRowIdx < 0 || dataRowIdx >= previewData.rawRows.length) return '';
-    
+
     const headerIdx = getLastHeaderIndexForField(key);
     if (headerIdx === -1) return '';
-    
+
     return previewData.rawRows[dataRowIdx][headerIdx] || '';
   };
 
@@ -427,24 +427,24 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
 
   const getEffectiveValidCount = useCallback(() => {
     if (!previewData) return 0;
-    
+
     return previewData.rows.filter(row => {
       if (!row.isValid) return false;
-      
-      const hasUnselectedBox = row.data.boxName && 
+
+      const hasUnselectedBox = row.data.boxName &&
         !previewData.relatedObjects.existingBoxNames.has(row.data.boxName.toLowerCase()) &&
         !selectedBoxesToCreate.has(row.data.boxName.toLowerCase());
-      
-      const hasUnselectedBatch = row.data.batchId && 
+
+      const hasUnselectedBatch = row.data.batchId &&
         !previewData.relatedObjects.existingBatchIds.has(row.data.batchId) &&
         !previewData.relatedObjects.existingBatchNames.has(row.data.batchId.toLowerCase()) &&
         !selectedBatchesToCreate.has(row.data.batchId.toLowerCase());
-      
+
       return !hasUnselectedBox && !hasUnselectedBatch;
     }).length;
   }, [previewData, selectedBoxesToCreate, selectedBatchesToCreate]);
 
-  const displayedRows = previewData 
+  const displayedRows = previewData
     ? (showOnlyInvalid ? previewData.rows.filter(r => !r.isValid) : previewData.rows)
     : [];
 
@@ -462,8 +462,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     const duplicates = getDuplicateMappings();
     const isCurrentDuplicate = currentMapping !== null && duplicates[currentMapping]?.includes(header);
     const duplicateHeaders = currentMapping !== null ? duplicates[currentMapping] : [];
-    const isLastOccurrence = currentMapping !== null && 
-      duplicateHeaders.length > 0 && 
+    const isLastOccurrence = currentMapping !== null &&
+      duplicateHeaders.length > 0 &&
       duplicateHeaders[duplicateHeaders.length - 1] === header;
 
     return (
@@ -473,7 +473,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
           onChange={(e) => {
             const value = e.target.value;
             const newField = value === '' ? null : value as keyof CsvRowData | 'boxName';
-            
+
             if (newField !== null && isFieldAlreadyMapped(newField, header)) {
               const confirmed = window.confirm(
                 `字段 "${ALL_TARGET_FIELDS.find(f => f.key === newField)?.label || newField}" ` +
@@ -485,7 +485,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                 return;
               }
             }
-            
+
             handleFieldMappingChange(header, newField);
           }}
           className={`w-full px-2 py-1.5 text-xs border rounded-md bg-parchment-50 text-oak-800 focus:outline-none focus:ring-2 focus:ring-rust-500 focus:border-transparent appearance-none pr-8 ${
@@ -493,12 +493,12 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
           }`}
         >
           {ALL_TARGET_FIELDS.map(field => {
-            const isMappedElsewhere = field.key !== null && 
-              field.key !== currentMapping && 
+            const isMappedElsewhere = field.key !== null &&
+              field.key !== currentMapping &&
               isFieldAlreadyMapped(field.key, header);
             return (
-              <option 
-                key={field.key === null ? 'null' : field.key} 
+              <option
+                key={field.key === null ? 'null' : field.key}
                 value={field.key === null ? '' : field.key}
                 disabled={isMappedElsewhere}
               >
@@ -639,8 +639,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
             <div className="max-w-2xl mx-auto">
               <div
                 className={`border-2 border-dashed rounded-xl p-12 text-center transition-all cursor-pointer ${
-                  isDragging 
-                    ? 'border-rust-500 bg-rust-50' 
+                  isDragging
+                    ? 'border-rust-500 bg-rust-50'
                     : 'border-oak-300 hover:border-oak-400 hover:bg-oak-50'
                 }`}
                 onDragOver={handleDragOver}
@@ -1046,8 +1046,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                               colSpan={DISPLAY_COLUMNS.length + 2}
                               className="px-3 py-12 text-center text-oak-500"
                             >
-                              {showOnlyInvalid 
-                                ? '没有发现问题数据' 
+                              {showOnlyInvalid
+                                ? '没有发现问题数据'
                                 : '没有数据可显示'}
                             </td>
                           </tr>
