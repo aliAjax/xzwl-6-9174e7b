@@ -374,9 +374,6 @@ export const validateAndPreviewCsv = (
   const existingBatchIds = new Set(existingBatches.map(b => b.id));
   const fileSpecimenNos = new Map<string, number[]>();
 
-  const newBoxMap = new Map<string, number[]>();
-  const newBatchMap = new Map<string, number[]>();
-
   const rows: ImportPreviewRow[] = dataRows.map((rowData, rowIdx) => {
     const actualRowIndex = rowIdx + 2;
     const data: Partial<CsvRowData> = {};
@@ -458,50 +455,13 @@ export const validateAndPreviewCsv = (
         }
         case 'boxName':
           data.boxName = value.trim();
-          if (data.boxName) {
-            const lowerBoxName = data.boxName.toLowerCase();
-            if (!existingBoxNames.has(lowerBoxName)) {
-              warnings.push(createError(
-                actualRowIndex,
-                '展盒名称',
-                'box_not_found',
-                `展盒 "${data.boxName}" 将在导入时自动创建`
-              ));
-              if (!newBoxMap.has(lowerBoxName)) {
-                newBoxMap.set(lowerBoxName, []);
-              }
-              newBoxMap.get(lowerBoxName)!.push(actualRowIndex);
-            }
-          }
           break;
         case 'notes':
           data.notes = value.trim();
           break;
         case 'batchId': {
           const batchValue = value.trim();
-          if (batchValue) {
-            const isExistingId = existingBatchIds.has(batchValue);
-            const lowerBatchName = batchValue.toLowerCase();
-            const isExistingName = existingBatchNames.has(lowerBatchName);
-
-            if (isExistingId || isExistingName) {
-              data.batchId = batchValue;
-            } else {
-              warnings.push(createError(
-                actualRowIndex,
-                '采集批次',
-                'batch_not_found',
-                `采集批次 "${batchValue}" 将在导入时自动创建`
-              ));
-              data.batchId = batchValue;
-              if (!newBatchMap.has(lowerBatchName)) {
-                newBatchMap.set(lowerBatchName, []);
-              }
-              newBatchMap.get(lowerBatchName)!.push(actualRowIndex);
-            }
-          } else {
-            data.batchId = '';
-          }
+          data.batchId = batchValue;
           break;
         }
         case 'complianceStatus': {
@@ -583,6 +543,49 @@ export const validateAndPreviewCsv = (
           `标本编号在文件内重复，第 ${otherRows.join('、')} 行也使用了该编号`
         ));
         row.isValid = false;
+      }
+    }
+  });
+
+  const newBoxMap = new Map<string, number[]>();
+  const newBatchMap = new Map<string, number[]>();
+
+  rows.forEach((row) => {
+    if (!row.isValid) return;
+
+    if (row.data.boxName) {
+      const lowerBoxName = row.data.boxName.toLowerCase();
+      if (!existingBoxNames.has(lowerBoxName)) {
+        row.warnings.push(createError(
+          row.rowIndex,
+          '展盒名称',
+          'box_not_found',
+          `展盒 "${row.data.boxName}" 将在导入时自动创建`
+        ));
+        if (!newBoxMap.has(lowerBoxName)) {
+          newBoxMap.set(lowerBoxName, []);
+        }
+        newBoxMap.get(lowerBoxName)!.push(row.rowIndex);
+      }
+    }
+
+    if (row.data.batchId) {
+      const batchValue = row.data.batchId;
+      const isExistingId = existingBatchIds.has(batchValue);
+      const lowerBatchName = batchValue.toLowerCase();
+      const isExistingName = existingBatchNames.has(lowerBatchName);
+
+      if (!isExistingId && !isExistingName) {
+        row.warnings.push(createError(
+          row.rowIndex,
+          '采集批次',
+          'batch_not_found',
+          `采集批次 "${batchValue}" 将在导入时自动创建`
+        ));
+        if (!newBatchMap.has(lowerBatchName)) {
+          newBatchMap.set(lowerBatchName, []);
+        }
+        newBatchMap.get(lowerBatchName)!.push(row.rowIndex);
       }
     }
   });
