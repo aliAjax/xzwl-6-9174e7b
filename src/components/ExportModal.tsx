@@ -23,11 +23,18 @@ export function ExportModal({ isOpen, onClose, specimens, boxes, batches, filter
 
   useEffect(() => {
     if (isOpen) {
-      setExportType('all');
+      const hasActiveFilters =
+        filters.search !== '' ||
+        filters.onlyUnphotographed ||
+        filters.boxId !== '' ||
+        filters.batchId !== '' ||
+        filters.complianceStatus !== '' ||
+        filters.onlyHighRisk;
+      setExportType(hasActiveFilters ? 'filtered' : 'all');
       setSelectedBoxId('');
       setError('');
     }
-  }, [isOpen]);
+  }, [isOpen, filters]);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -212,7 +219,7 @@ export function ExportModal({ isOpen, onClose, specimens, boxes, batches, filter
                       <p className="text-sm text-oak-500">
                         共 {filteredSpecimens.length} 件符合筛选条件
                       </p>
-                      {exportType === 'filtered' && filterSummary.length > 0 && (
+                      {filterSummary.length > 0 && (
                         <div className="mt-2 p-2 bg-oak-50 rounded-lg border border-oak-200">
                           <p className="text-xs text-oak-600 font-medium mb-1">当前筛选条件:</p>
                           <div className="flex flex-wrap gap-1">
