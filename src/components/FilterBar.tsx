@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertTriangle, Search, X } from 'lucide-react';
+import { AlertTriangle, Search, X, Edit3 } from 'lucide-react';
 import type { Box, Filters, CollectionBatch, FilterView } from '../types';
 import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { useFilterViews } from '../hooks/useFilterViews';
@@ -11,9 +11,11 @@ interface FilterBarProps {
   onFiltersChange: (filters: Filters) => void;
   boxes: Box[];
   batches: CollectionBatch[];
+  onOpenBatchEdit: () => void;
+  hasFilteredResults: boolean;
 }
 
-export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBarProps) {
+export function FilterBar({ filters, onFiltersChange, boxes, batches, onOpenBatchEdit, hasFilteredResults }: FilterBarProps) {
   const { views, saveView, deleteView, renameView } = useFilterViews();
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
@@ -215,6 +217,22 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
           >
             <AlertTriangle className="w-4 h-4" />
             只看高风险
+          </button>
+
+          <div className="h-8 w-px bg-oak-200 mx-1" />
+
+          <button
+            type="button"
+            onClick={onOpenBatchEdit}
+            disabled={!hasFilteredResults}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
+              hasFilteredResults
+                ? 'bg-oak-700 text-parchment-50 hover:bg-oak-800 border-2 border-oak-700'
+                : 'bg-oak-100 text-oak-400 cursor-not-allowed border-2 border-oak-200'
+            }`}
+          >
+            <Edit3 className="w-4 h-4" />
+            批量编辑
           </button>
         </div>
       </div>

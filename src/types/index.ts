@@ -370,3 +370,29 @@ export interface MergeSnapshot {
   timestamp?: string;
   description?: string;
 }
+
+export type BatchEditField = 'photographed' | 'pinnedStatus' | 'boxId' | 'batchId' | 'complianceStatus';
+
+export interface BatchEditData {
+  photographed?: boolean;
+  pinnedStatus?: boolean;
+  boxId?: string;
+  batchId?: string;
+  complianceStatus?: ComplianceStatus;
+}
+
+export interface BatchEditFieldChange {
+  field: BatchEditField;
+  fieldLabel: string;
+  oldValue: string;
+  newValue: string;
+  affectedCount: number;
+}
+
+export const BATCH_EDIT_FIELD_LABELS: Record<BatchEditField, string> = {
+  photographed: '拍照状态',
+  pinnedStatus: '针插状态',
+  boxId: '所属展盒',
+  batchId: '所属采集批次',
+  complianceStatus: '合规状态',
+};

@@ -14,6 +14,7 @@ import { PhotographyTaskList } from './components/PhotographyTaskList';
 import { ExportModal } from './components/ExportModal';
 import { ImportPreviewModal } from './components/ImportPreviewModal';
 import { BoxTransferModal } from './components/BoxTransferModal';
+import { BatchEditModal } from './components/BatchEditModal';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { BackupDiffMergeModal } from './components/BackupDiffMergeModal';
 import { LabelPrintModal } from './components/LabelPrintModal';
@@ -45,6 +46,7 @@ function App() {
     markPhotographed,
     transferSpecimens,
     togglePinned,
+    updateSpecimensBatch,
     addBox,
     updateBox,
     deleteBox,
@@ -79,6 +81,7 @@ function App() {
   const [backupRestoreModalOpen, setBackupRestoreModalOpen] = useState(false);
   const [diffMergeModalOpen, setDiffMergeModalOpen] = useState(false);
   const [labelPrintModalOpen, setLabelPrintModalOpen] = useState(false);
+  const [batchEditModalOpen, setBatchEditModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
     return specimens.filter((s) => {
@@ -212,6 +215,8 @@ function App() {
               onFiltersChange={setFilters}
               boxes={boxes}
               batches={batches}
+              onOpenBatchEdit={() => setBatchEditModalOpen(true)}
+              hasFilteredResults={filteredSpecimens.length > 0}
             />
 
             {!hasFilteredResults && filteredSpecimens.length === 0 ? (
@@ -356,6 +361,19 @@ function App() {
         batches={batches}
         currentFilters={filters}
         filteredSpecimens={filteredSpecimens}
+      />
+
+      <BatchEditModal
+        isOpen={batchEditModalOpen}
+        onClose={() => setBatchEditModalOpen(false)}
+        boxes={boxes}
+        specimens={specimens}
+        batches={batches}
+        currentFilters={filters}
+        filteredSpecimens={filteredSpecimens}
+        onBatchEdit={(specimenIds, data) => {
+          updateSpecimensBatch(specimenIds, data);
+        }}
       />
     </div>
   );

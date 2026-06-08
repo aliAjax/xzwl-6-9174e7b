@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData, BoxTransferData } from '../types';
+import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData, BoxTransferData, BatchEditData } from '../types';
 import { HIGH_RISK_STATUSES } from '../types';
 import { useLocalStorage } from './useLocalStorage';
 import { mockBoxes, mockSpecimens, mockBatches } from '../data/mockData';
@@ -95,6 +95,16 @@ export function useSpecimens() {
     setSpecimens(prev =>
       prev.map(s =>
         s.id === id ? { ...s, pinnedStatus: !s.pinnedStatus, updatedAt: now } : s
+      )
+    );
+  }, [setSpecimens]);
+
+  const updateSpecimensBatch = useCallback((ids: string[], data: BatchEditData) => {
+    const now = new Date().toISOString();
+    const idSet = new Set(ids);
+    setSpecimens(prev =>
+      prev.map(s =>
+        idSet.has(s.id) ? { ...s, ...data, updatedAt: now } : s
       )
     );
   }, [setSpecimens]);
@@ -198,6 +208,7 @@ export function useSpecimens() {
     markPhotographed,
     transferSpecimens,
     togglePinned,
+    updateSpecimensBatch,
     addBox,
     updateBox,
     deleteBox,
