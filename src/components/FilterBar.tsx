@@ -14,7 +14,7 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBarProps) {
-  const { views, saveView, deleteView, renameView, isFiltersEmpty } = useFilterViews();
+  const { views, saveView, deleteView, renameView } = useFilterViews();
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [activeViewId, setActiveViewId] = useState<string | null>(null);
   const [editingView, setEditingView] = useState<FilterView | null>(null);
