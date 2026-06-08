@@ -1,6 +1,10 @@
+import { useState, useEffect } from 'react';
 import { AlertTriangle, Search, X } from 'lucide-react';
-import type { Box, Filters, CollectionBatch } from '../types';
+import type { Box, Filters, CollectionBatch, FilterView } from '../types';
 import { COMPLIANCE_STATUS_OPTIONS } from '../types';
+import { useFilterViews } from '../hooks/useFilterViews';
+import { FilterViewSelector } from './FilterViewSelector';
+import { SaveViewModal } from './SaveViewModal';
 
 interface FilterBarProps {
   filters: Filters;
@@ -10,6 +14,23 @@ interface FilterBarProps {
 }
 
 export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBarProps) {
+  const { views, saveView, deleteView, renameView, isFiltersEmpty } = useFilterViews();
+  const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [editingView, setEditingView] = useState<FilterView | null>(null);
+
+  useEffect(() => {
+    const matchingView = views.find(v =>
+      v.filters.search === filters.search &&
+      v.filters.onlyUnphotographed === filters.onlyUnphotographed &&
+      v.filters.boxId === filters.boxId &&
+      v.filters.batchId === filters.batchId &&
+      v.filters.complianceStatus === filters.complianceStatus &&
+      v.filters.onlyHighRisk === filters.onlyHighRisk
+    );
+    setActiveViewId(matchingView?.id || null);
+  }, [filters, views]);
+
   const handleSearchChange = (value: string) => {
     onFiltersChange({ ...filters, search: value });
   };
@@ -47,8 +68,57 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
 
   const hasActiveFilters = filters.search || filters.onlyUnphotographed || filters.boxId || filters.batchId || filters.complianceStatus || filters.onlyHighRisk;
 
+  const handleSelectView = (view: FilterView) => {
+    onFiltersChange(view.filters);
+  };
+
+  const handleSaveView = () => {
+    setEditingView(null);
+    setSaveModalOpen(true);
+  };
+
+  const handleSave = (name: string) => {
+    saveView(name, filters);
+  };
+
+  const handleDeleteView = (id: string) => {
+    deleteView(id);
+    if (activeViewId === id) {
+      setActiveViewId(null);
+    }
+  };
+
+  const handleUpdateView = (view: FilterView) => {
+    renameView(view.id, view.name);
+  };
+
   return (
-    <div className="bg-parchment-50 border border-oak-200 rounded-xl p-4 shadow-card">
+    <div className="bg-parchment-50 border border-oak-200 rounded-xl p-4 shadow-card space-y-4">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <FilterViewSelector
+          views={views}
+          currentFilters={filters}
+          activeViewId={activeViewId}
+          onSelectView={handleSelectView}
+          onSaveView={handleSaveView}
+          onDeleteView={handleDeleteView}
+          onUpdateView={handleUpdateView}
+          boxes={boxes}
+          batches={batches}
+        />
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="flex items-center gap-1 text-oak-500 hover:text-oak-700 text-sm font-medium transition-colors"
+          >
+            <X className="w-4 h-4" />
+            清除筛选
+          </button>
+        )}
+      </div>
+
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-oak-400" />
@@ -146,19 +216,22 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
             <AlertTriangle className="w-4 h-4" />
             只看高风险
           </button>
-
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="flex items-center gap-1 text-oak-500 hover:text-oak-700 text-sm font-medium transition-colors"
-            >
-              <X className="w-4 h-4" />
-              清除筛选
-            </button>
-          )}
         </div>
       </div>
+
+      <SaveViewModal
+        isOpen={saveModalOpen}
+        onClose={() => {
+          setSaveModalOpen(false);
+          setEditingView(null);
+        }}
+        onSave={handleSave}
+        currentFilters={filters}
+        views={views}
+        boxes={boxes}
+        batches={batches}
+        existingView={editingView}
+      />
     </div>
   );
 }

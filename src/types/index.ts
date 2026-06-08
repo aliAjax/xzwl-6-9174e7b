@@ -65,6 +65,14 @@ export interface Filters {
   onlyHighRisk: boolean;
 }
 
+export interface FilterView {
+  id: string;
+  name: string;
+  filters: Filters;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type SpecimenFormData = Omit<Specimen, 'id' | 'createdAt' | 'updatedAt'>;
 
 export type BoxFormData = Omit<Box, 'id' | 'createdAt'>;
