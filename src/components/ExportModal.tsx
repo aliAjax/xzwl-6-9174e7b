@@ -53,6 +53,10 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
       photographed: s.photographed,
       boxName: getBoxName(s.boxId),
       notes: s.notes,
+      complianceStatus: s.complianceStatus,
+      permitNumber: s.permitNumber,
+      permitExpiryDate: formatDate(s.permitExpiryDate),
+      complianceNotes: s.complianceNotes,
     }));
   }, [specimens, boxes, exportType, selectedBoxId]);
 

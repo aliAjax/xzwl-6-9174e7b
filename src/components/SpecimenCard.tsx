@@ -1,5 +1,6 @@
-import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList, FileEdit } from 'lucide-react';
-import type { Specimen, CollectionBatch } from '../types';
+import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList, FileEdit, AlertTriangle, Shield, Clock } from 'lucide-react';
+import type { Specimen, CollectionBatch, ComplianceStatus } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS, HIGH_RISK_STATUSES } from '../types';
 import { formatDate } from '../utils/helpers';
 
 interface SpecimenCardProps {

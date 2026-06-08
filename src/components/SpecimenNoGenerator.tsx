@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react';
 import { X, Hash, AlertTriangle, CheckCircle, Copy } from 'lucide-react';
 import type { SpecimenFormData, Box } from '../types';
+import { DEFAULT_COMPLIANCE_STATUS } from '../types';
 import { getTodayString } from '../utils/helpers';
 
 const ORDER_PREFIXES = [
@@ -92,6 +93,10 @@ export function SpecimenNoGenerator({
         batchId: '',
         photographed: false,
         notes: '',
+        complianceStatus: DEFAULT_COMPLIANCE_STATUS,
+        permitNumber: '',
+        permitExpiryDate: '',
+        complianceNotes: '',
       }));
 
     if (newSpecimens.length > 0) {

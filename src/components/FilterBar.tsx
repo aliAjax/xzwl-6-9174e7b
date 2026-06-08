@@ -1,5 +1,6 @@
-import { Search, X } from 'lucide-react';
-import type { Box, Filters, CollectionBatch } from '../types';
+import { Search, X, AlertTriangle } from 'lucide-react';
+import type { Box, Filters, CollectionBatch, ComplianceStatus } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 
 interface FilterBarProps {
   filters: Filters;

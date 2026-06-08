@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData, BoxTransferData } from '../types';
 import { useLocalStorage } from './useLocalStorage';
 import { mockBoxes, mockSpecimens, mockBatches } from '../data/mockData';
-import { generateId } from '../utils/helpers';
+import { generateId, migrateSpecimenData, isHighRiskCompliance } from '../utils/helpers';
 
 const BOXES_KEY = 'insect_boxes';
 const SPECIMENS_KEY = 'insect_specimens';

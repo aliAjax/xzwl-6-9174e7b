@@ -1,4 +1,4 @@
-import { Bug, Camera, Package, Clock, ClipboardList } from 'lucide-react';
+import { Bug, Camera, Package, Clock, ClipboardList, AlertTriangle, Shield, AlertCircle } from 'lucide-react';
 
 interface StatsCardProps {
   stats: {

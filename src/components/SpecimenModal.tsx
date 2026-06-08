@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { Box, Specimen, SpecimenFormData, CollectionBatch } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { getTodayString } from '../utils/helpers';
 
 interface SpecimenModalProps {

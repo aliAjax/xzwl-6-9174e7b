@@ -6,6 +6,14 @@ export interface Box {
   createdAt: string;
 }
 
+export type ComplianceStatus = 
+  | 'not_relevant'
+  | 'protected_species'
+  | 'invasive_species'
+  | 'special_permit'
+  | 'expired_permit'
+  | 'unknown';
+
 export interface CollectionBatch {
   id: string;
   name: string;
@@ -15,6 +23,27 @@ export interface CollectionBatch {
   notes: string;
   createdAt: string;
 }
+
+export type ComplianceStatus = 
+  | 'not_relevant'
+  | 'protected_species'
+  | 'invasive_species'
+  | 'special_permit'
+  | 'expired_permit'
+  | 'unknown';
+
+export const COMPLIANCE_STATUS_OPTIONS: { value: ComplianceStatus; label: string; color: string; bgColor: string; borderColor: string; description: string }[] = [
+  { value: 'not_relevant', label: '无需合规', color: 'text-oak-600', bgColor: 'bg-oak-100', borderColor: 'border-oak-300', description: '普通物种，无需特殊许可' },
+  { value: 'protected_species', label: '保护物种', color: 'text-amber-700', bgColor: 'bg-amber-100', borderColor: 'border-amber-300', description: '国家或地方保护动物' },
+  { value: 'invasive_species', label: '外来物种', color: 'text-red-700', bgColor: 'bg-red-100', borderColor: 'border-red-300', description: '外来入侵物种，需特别管理' },
+  { value: 'special_permit', label: '特许采集', color: 'text-blue-700', bgColor: 'bg-blue-100', borderColor: 'border-blue-300', description: '持有特殊采集许可证' },
+  { value: 'expired_permit', label: '许可过期', color: 'text-rust-700', bgColor: 'bg-rust-100', borderColor: 'border-rust-300', description: '许可证已过期，需更新' },
+  { value: 'unknown', label: '待确认', color: 'text-purple-700', bgColor: 'bg-purple-100', borderColor: 'border-purple-300', description: '合规状态待确认' },
+];
+
+export const HIGH_RISK_STATUSES: ComplianceStatus[] = ['protected_species', 'invasive_species', 'expired_permit', 'unknown'];
+
+export const DEFAULT_COMPLIANCE_STATUS: ComplianceStatus = 'not_relevant';
 
 export interface Specimen {
   id: string;
@@ -27,6 +56,10 @@ export interface Specimen {
   batchId: string;
   photographed: boolean;
   notes: string;
+  complianceStatus: ComplianceStatus;
+  permitNumber: string;
+  permitExpiryDate: string;
+  complianceNotes: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -36,6 +69,8 @@ export interface Filters {
   onlyUnphotographed: boolean;
   boxId: string;
   batchId: string;
+  complianceStatus: ComplianceStatus | '';
+  onlyHighRisk: boolean;
 }
 
 export type SpecimenFormData = Omit<Specimen, 'id' | 'createdAt' | 'updatedAt'>;
@@ -56,6 +91,10 @@ export interface CsvRowData {
   boxName: string;
   notes: string;
   batchId: string;
+  complianceStatus: string;
+  permitNumber: string;
+  permitExpiryDate: string;
+  complianceNotes: string;
 }
 
 export interface BoxTransferData {
@@ -70,7 +109,8 @@ export type ValidationErrorType =
   | 'duplicate_no_in_file' 
   | 'box_not_found' 
   | 'invalid_date' 
-  | 'invalid_boolean';
+  | 'invalid_boolean'
+  | 'invalid_compliance_status';
 
 export interface ValidationError {
   rowIndex: number;
@@ -96,7 +136,7 @@ export interface ImportPreviewData {
   totalCount: number;
 }
 
-export const BACKUP_FILE_VERSION = 1;
+export const BACKUP_FILE_VERSION = 2;
 
 export interface BackupFileData {
   version: number;

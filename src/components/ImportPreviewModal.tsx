@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine } from 'lucide-react';
 import type { Box, Specimen, ImportPreviewData, SpecimenFormData } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData } from '../utils/helpers';
 
 interface ImportPreviewModalProps {

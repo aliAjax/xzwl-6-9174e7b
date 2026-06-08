@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Box, Specimen, SpecimenFormData, Filters } from './types';
+import { HIGH_RISK_STATUSES } from './types';
 import { useSpecimens } from './hooks/useSpecimens';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
@@ -62,6 +63,8 @@ function App() {
     onlyUnphotographed: false,
     boxId: '',
     batchId: '',
+    complianceStatus: '',
+    onlyHighRisk: false,
   });
 
   const [specimenModalOpen, setSpecimenModalOpen] = useState(false);
@@ -97,6 +100,11 @@ function App() {
       if (filters.batchId && s.batchId !== filters.batchId) {
         return false;
       }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const complianceStatus = (s as any).complianceStatus ?? 'not_relevant';
+      if (filters.complianceStatus && complianceStatus !== filters.complianceStatus) return false;
+      if (filters.onlyHighRisk && !HIGH_RISK_STATUSES.includes(complianceStatus)) return false;
 
       return true;
     });

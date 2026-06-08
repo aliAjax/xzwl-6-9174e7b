@@ -13,9 +13,10 @@ import type {
   RestoreResult,
   SpecimenLabelData,
   LabelFieldCheckResult,
+  ComplianceStatus,
 } from '../types';
 import type { Box, Specimen, CollectionBatch } from '../types';
-import { LABEL_FIELDS } from '../types';
+import { LABEL_FIELDS, COMPLIANCE_STATUS_OPTIONS } from '../types';
 
 export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
