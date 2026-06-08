@@ -299,24 +299,43 @@ export function LabelPrintModal({
             { key: 'select', label: '选择标本', icon: FileText },
             { key: 'settings', label: '打印设置', icon: Settings },
             { key: 'preview', label: '预览打印', icon: Eye },
-          ].map(({ key, label, icon: Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => selectedSpecimens.length > 0 && setStep(key as typeof step)}
-              disabled={key !== 'select' && selectedSpecimens.length === 0}
-              className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
-                step === key
-                  ? 'bg-oak-700 text-parchment-50'
-                  : selectedSpecimens.length > 0 || key === 'select'
-                  ? 'bg-parchment-50 text-oak-700 hover:bg-oak-100 border border-oak-300'
-                  : 'bg-oak-100 text-oak-400 cursor-not-allowed border border-oak-200'
-              }`}
-            >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
-          ))}
+          ].map(({ key, label, icon: Icon }) => {
+            const targetStep = key as typeof step;
+            const stepOrder = ['select', 'settings', 'preview'];
+            const currentIndex = stepOrder.indexOf(step);
+            const targetIndex = stepOrder.indexOf(targetStep);
+            const isForward = targetIndex > currentIndex;
+
+            const handleStepClick = () => {
+              if (selectedSpecimens.length === 0 && key !== 'select') return;
+              if (key === 'select') {
+                setStep(targetStep);
+              } else if (isForward) {
+                handleNextWithFieldCheck(targetStep as 'settings' | 'preview');
+              } else {
+                setStep(targetStep);
+              }
+            };
+
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={handleStepClick}
+                disabled={key !== 'select' && selectedSpecimens.length === 0}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all ${
+                  step === key
+                    ? 'bg-oak-700 text-parchment-50'
+                    : selectedSpecimens.length > 0 || key === 'select'
+                    ? 'bg-parchment-50 text-oak-700 hover:bg-oak-100 border border-oak-300'
+                    : 'bg-oak-100 text-oak-400 cursor-not-allowed border border-oak-200'
+                }`}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            );
+          })}
           <div className="flex-1" />
           {selectedSpecimens.length > 0 && (
             <>
