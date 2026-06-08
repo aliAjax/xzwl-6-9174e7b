@@ -66,20 +66,20 @@ const VALID_COMPLIANCE_VALUES = new Set([
 const parseComplianceStatus = (value: string): ComplianceStatus | null => {
   const trimmed = value.trim();
   if (!trimmed) return null;
-  
+
   if (!VALID_COMPLIANCE_VALUES.has(trimmed) && !VALID_COMPLIANCE_VALUES.has(trimmed.toLowerCase())) {
     return null;
   }
-  
+
   if (COMPLIANCE_STATUS_LABEL_TO_VALUE[trimmed]) {
     return COMPLIANCE_STATUS_LABEL_TO_VALUE[trimmed];
   }
-  
+
   const lowerValue = trimmed.toLowerCase();
-  const option = COMPLIANCE_STATUS_OPTIONS.find(opt => 
+  const option = COMPLIANCE_STATUS_OPTIONS.find(opt =>
     opt.value === lowerValue || opt.label === trimmed
   );
-  
+
   return option?.value || null;
 };
 
@@ -977,7 +977,7 @@ export const handleSpecimenNoDuplicates = (
   const remappedSpecimens = Array.isArray(backupData.data.specimens)
     ? backupData.data.specimens.map(specimen => {
         const migratedSpecimen = migrateSpecimenWithCompliance(specimen);
-        
+
         if (!migratedSpecimen.specimenNo) {
           return migratedSpecimen;
         }
@@ -1542,7 +1542,7 @@ export const analyzeDifferences = (
     } else if (!current && backup) {
       const migratedBackup = migrateSpecimenWithCompliance(backup);
       const noConflict = currentSpecimenNoMap.has(migratedBackup.specimenNo.toLowerCase());
-      
+
       if (noConflict) {
         const existing = currentSpecimenNoMap.get(migratedBackup.specimenNo.toLowerCase())!;
         processedSpecimenNos.add(existing.id);
@@ -1605,14 +1605,14 @@ export const analyzeDifferences = (
       }
     } else if (current && backup) {
       if (processedSpecimenNos.has(current.id)) return;
-      
+
       const migratedBackup = migrateSpecimenWithCompliance(backup);
       const fieldDiffs = compareObjects(
         current as unknown as Record<string, unknown>,
         migratedBackup as unknown as Record<string, unknown>,
         SPECIMEN_COMPARE_FIELDS
       );
-      
+
       const missingBox = migratedBackup.boxId && !validBoxIds.has(migratedBackup.boxId) && !current.boxId;
       const missingBatch = migratedBackup.batchId && !validBatchIds.has(migratedBackup.batchId) && !current.batchId;
 
@@ -1672,7 +1672,7 @@ export const analyzeDifferences = (
   return {
     items,
     stats,
-    hasConflicts: items.some(i => 
+    hasConflicts: items.some(i =>
       i.conflictType === 'specimen_no_conflict' ||
       i.conflictType === 'field_inconsistent' ||
       i.conflictType === 'missing_box_ref' ||
@@ -1689,11 +1689,11 @@ const buildIdRemapping = (
   const specimenIdMap: Record<string, string> = {};
 
   items.forEach(item => {
-    const isNewItem = item.conflictType === 'new_in_backup' || 
+    const isNewItem = item.conflictType === 'new_in_backup' ||
                       item.conflictType === 'missing_box_ref' ||
                       item.conflictType === 'missing_batch_ref';
-    
-    const shouldGenerateNewId = 
+
+    const shouldGenerateNewId =
       (item.selectedStrategy === 'keep_import' && item.conflictType === 'new_in_backup') ||
       (item.selectedStrategy === 'manual' && isNewItem);
 
@@ -1728,6 +1728,21 @@ const applyIdRemappingToSpecimen = (
     boxId: specimen.boxId ? (boxIdMap[specimen.boxId] || specimen.boxId) : '',
     batchId: specimen.batchId ? (batchIdMap[specimen.batchId] || specimen.batchId) : '',
   };
+};
+
+const clearDanglingSpecimenReferences = (
+  specimens: Specimen[],
+  boxes: Box[],
+  batches: CollectionBatch[]
+): Specimen[] => {
+  const validBoxIds = new Set(boxes.map(box => box.id));
+  const validBatchIds = new Set(batches.map(batch => batch.id));
+
+  return specimens.map(specimen => ({
+    ...specimen,
+    boxId: specimen.boxId && validBoxIds.has(specimen.boxId) ? specimen.boxId : '',
+    batchId: specimen.batchId && validBatchIds.has(specimen.batchId) ? specimen.batchId : '',
+  }));
 };
 
 const applyReferenceRepair = (
@@ -1825,7 +1840,7 @@ const processBoxes = (
     if (strategy === 'keep_import' && item.backupData) {
       const backupBox = item.backupData as Box;
       const newId = boxIdMap[backupBox.id] || backupBox.id;
-      
+
       if (item.conflictType === 'new_in_backup') {
         result.push({ ...backupBox, id: newId });
         resultStats.boxesAdded++;
@@ -1839,7 +1854,7 @@ const processBoxes = (
     } else if (strategy === 'manual' && item.manualMergedData) {
       const manualData = item.manualMergedData as Box;
       const isNewItem = item.conflictType === 'new_in_backup';
-      
+
       if (isNewItem) {
         const newId = boxIdMap[manualData.id] || generateId();
         if (!boxIdMap[manualData.id]) {
@@ -1884,7 +1899,7 @@ const processBatches = (
     if (strategy === 'keep_import' && item.backupData) {
       const backupBatch = item.backupData as CollectionBatch;
       const newId = batchIdMap[backupBatch.id] || backupBatch.id;
-      
+
       if (item.conflictType === 'new_in_backup') {
         result.push({ ...backupBatch, id: newId });
         resultStats.batchesAdded++;
@@ -1898,7 +1913,7 @@ const processBatches = (
     } else if (strategy === 'manual' && item.manualMergedData) {
       const manualData = item.manualMergedData as CollectionBatch;
       const isNewItem = item.conflictType === 'new_in_backup';
-      
+
       if (isNewItem) {
         const newId = batchIdMap[manualData.id] || generateId();
         if (!batchIdMap[manualData.id]) {
@@ -2089,6 +2104,7 @@ export const performDiffMerge = (
     diffItems, mergedBoxes, mergedBatches, mergedSpecimens,
     boxIdMap, batchIdMap, specimenIdMap, resultStats
   );
+  mergedSpecimens = clearDanglingSpecimenReferences(mergedSpecimens, mergedBoxes, mergedBatches);
 
   setBoxes(mergedBoxes);
   setBatches(mergedBatches);
