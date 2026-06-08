@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { Box, Specimen, SpecimenFormData, CollectionBatch, ComplianceStatus } from '../types';
-import { DEFAULT_COMPLIANCE_STATUS } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS, DEFAULT_COMPLIANCE_STATUS } from '../types';
 import { getTodayString } from '../utils/helpers';
 
 interface SpecimenModalProps {
@@ -271,6 +271,69 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
               rows={3}
               className="input-field resize-none"
             />
+          </div>
+
+          <div className="space-y-4 rounded-lg border border-oak-200 bg-oak-50 p-4">
+            <div>
+              <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                合规状态
+              </label>
+              <select
+                name="complianceStatus"
+                value={formData.complianceStatus}
+                onChange={(e) => handleChange('complianceStatus', e.target.value)}
+                className="input-field"
+              >
+                {COMPLIANCE_STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                  许可证编号
+                </label>
+                <input
+                  type="text"
+                  name="permitNumber"
+                  value={formData.permitNumber}
+                  onChange={(e) => handleChange('permitNumber', e.target.value)}
+                  placeholder="如: BH-2024-FJ-0015"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                  到期日期
+                </label>
+                <input
+                  type="date"
+                  name="permitExpiryDate"
+                  value={formData.permitExpiryDate}
+                  onChange={(e) => handleChange('permitExpiryDate', e.target.value)}
+                  className="input-field"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-oak-700 mb-1.5">
+                合规备注
+              </label>
+              <textarea
+                name="complianceNotes"
+                value={formData.complianceNotes}
+                onChange={(e) => handleChange('complianceNotes', e.target.value)}
+                placeholder="补充保护等级、外来物种管理要求或采集许可说明..."
+                rows={3}
+                className="input-field resize-none"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-oak-200">

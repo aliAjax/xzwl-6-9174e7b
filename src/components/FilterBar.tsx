@@ -1,5 +1,6 @@
-import { Search, X } from 'lucide-react';
+import { AlertTriangle, Search, X } from 'lucide-react';
 import type { Box, Filters, CollectionBatch } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 
 interface FilterBarProps {
   filters: Filters;
@@ -23,6 +24,14 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
 
   const handleBatchChange = (value: string) => {
     onFiltersChange({ ...filters, batchId: value });
+  };
+
+  const handleComplianceChange = (value: string) => {
+    onFiltersChange({ ...filters, complianceStatus: value as Filters['complianceStatus'] });
+  };
+
+  const handleToggleHighRisk = () => {
+    onFiltersChange({ ...filters, onlyHighRisk: !filters.onlyHighRisk });
   };
 
   const clearFilters = () => {
@@ -105,6 +114,38 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
               ))}
             </select>
           </div>
+
+          <div className="flex items-center gap-2">
+            <label htmlFor="compliance-filter" className="text-oak-600 text-sm font-medium whitespace-nowrap">
+              合规:
+            </label>
+            <select
+              id="compliance-filter"
+              value={filters.complianceStatus}
+              onChange={(e) => handleComplianceChange(e.target.value)}
+              className="input-field max-w-44"
+            >
+              <option value="">全部状态</option>
+              {COMPLIANCE_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleToggleHighRisk}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-200 font-medium text-sm ${
+              filters.onlyHighRisk
+                ? 'bg-amber-100 text-amber-800 border-2 border-amber-400'
+                : 'bg-parchment-50 text-oak-700 border-2 border-oak-200 hover:border-oak-300'
+            }`}
+          >
+            <AlertTriangle className="w-4 h-4" />
+            只看高风险
+          </button>
 
           {hasActiveFilters && (
             <button
