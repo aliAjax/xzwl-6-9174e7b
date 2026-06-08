@@ -204,7 +204,7 @@ const FIELD_NAME_PATTERNS: Record<keyof CsvRowData | 'boxName', FieldPattern> = 
   },
   complianceStatus: {
     exact: ['合规状态', 'compliancestatus', 'compliance_status', 'compliance'],
-    contains: ['合规状态', 'compliancestatus', 'compliance_status', 'compliance'],
+    contains: ['合规状态', 'compliancestatus', 'compliance_status'],
   },
   permitNumber: {
     exact: ['许可证编号', '许可证号', '许可编号', 'permitnumber', 'permit_number', 'permitno', 'permit_no'],
@@ -330,14 +330,74 @@ const parseBooleanValue = (value: string): boolean | null => {
 
 const isValidDate = (dateString: string): boolean => {
   if (!dateString.trim()) return true;
-  const timestamp = Date.parse(dateString);
-  return !isNaN(timestamp);
+  const trimmed = dateString.trim();
+  
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const altSlashMatch = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  
+  let year: number, month: number, day: number;
+  
+  if (isoMatch) {
+    year = parseInt(isoMatch[1], 10);
+    month = parseInt(isoMatch[2], 10) - 1;
+    day = parseInt(isoMatch[3], 10);
+  } else if (slashMatch) {
+    month = parseInt(slashMatch[1], 10) - 1;
+    day = parseInt(slashMatch[2], 10);
+    year = parseInt(slashMatch[3], 10);
+  } else if (altSlashMatch) {
+    year = parseInt(altSlashMatch[1], 10);
+    month = parseInt(altSlashMatch[2], 10) - 1;
+    day = parseInt(altSlashMatch[3], 10);
+  } else {
+    const date = new Date(trimmed);
+    if (isNaN(date.getTime())) return false;
+    year = date.getFullYear();
+    month = date.getMonth();
+    day = date.getDate();
+  }
+  
+  const date = new Date(year, month, day);
+  return date.getFullYear() === year && 
+         date.getMonth() === month && 
+         date.getDate() === day;
 };
 
 const normalizeDate = (dateString: string): string => {
   if (!dateString.trim()) return '';
-  const date = new Date(dateString);
-  return date.toISOString().split('T')[0];
+  const trimmed = dateString.trim();
+  
+  const isoMatch = trimmed.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  const slashMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const altSlashMatch = trimmed.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+  
+  let year: number, month: number, day: number;
+  
+  if (isoMatch) {
+    year = parseInt(isoMatch[1], 10);
+    month = parseInt(isoMatch[2], 10) - 1;
+    day = parseInt(isoMatch[3], 10);
+  } else if (slashMatch) {
+    month = parseInt(slashMatch[1], 10) - 1;
+    day = parseInt(slashMatch[2], 10);
+    year = parseInt(slashMatch[3], 10);
+  } else if (altSlashMatch) {
+    year = parseInt(altSlashMatch[1], 10);
+    month = parseInt(altSlashMatch[2], 10) - 1;
+    day = parseInt(altSlashMatch[3], 10);
+  } else {
+    const date = new Date(trimmed);
+    year = date.getFullYear();
+    month = date.getMonth();
+    day = date.getDate();
+  }
+  
+  const date = new Date(year, month, day);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 };
 
 const createError = (
@@ -423,6 +483,8 @@ export const validateAndPreviewCsv = (
             } else {
               data.collectionDate = normalizeDate(value);
             }
+          } else {
+            data.collectionDate = '';
           }
           break;
         case 'pinnedStatus': {
@@ -496,6 +558,8 @@ export const validateAndPreviewCsv = (
             } else {
               data.permitExpiryDate = normalizeDate(value);
             }
+          } else {
+            data.permitExpiryDate = '';
           }
           break;
         case 'complianceNotes':
@@ -688,6 +752,8 @@ export const revalidatePreviewData = (
             } else {
               data.collectionDate = normalizeDate(value);
             }
+          } else {
+            data.collectionDate = '';
           }
           break;
         case 'pinnedStatus': {
@@ -761,6 +827,8 @@ export const revalidatePreviewData = (
             } else {
               data.permitExpiryDate = normalizeDate(value);
             }
+          } else {
+            data.permitExpiryDate = '';
           }
           break;
         case 'complianceNotes':
