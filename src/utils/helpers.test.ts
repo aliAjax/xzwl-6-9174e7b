@@ -243,11 +243,6 @@ describe('autoDetectFieldMapping', () => {
 });
 
 describe('validateAndPreviewCsv', () => {
-  const emptyExisting = {
-    existingSpecimens: [] as Specimen[],
-    existingBoxes: [] as Box[],
-    existingBatches: [] as CollectionBatch[],
-  };
 
   it('should throw error for empty CSV', () => {
     expect(() => validateAndPreviewCsv('', [], [], [])).toThrow('CSV文件为空或格式不正确');
