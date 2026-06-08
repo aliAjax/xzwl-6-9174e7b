@@ -273,3 +273,80 @@ export const LABEL_TEMPLATES: Record<LabelTemplateType, {
     perPage: { A4: 28, A5: 12 },
   },
 };
+
+export type DiffItemType = 'specimen' | 'box' | 'batch';
+
+export type DiffConflictType =
+  | 'new_in_backup'
+  | 'deleted_in_backup'
+  | 'id_conflict'
+  | 'specimen_no_conflict'
+  | 'field_inconsistent'
+  | 'missing_box_ref'
+  | 'missing_batch_ref';
+
+export type MergeStrategy = 'keep_current' | 'keep_import' | 'manual';
+
+export interface FieldDiff {
+  field: string;
+  currentValue: unknown;
+  backupValue: unknown;
+}
+
+export interface DiffItem {
+  type: DiffItemType;
+  conflictType: DiffConflictType;
+  id: string;
+  currentData?: Box | Specimen | CollectionBatch | null;
+  backupData?: Box | Specimen | CollectionBatch | null;
+  fieldDiffs?: FieldDiff[];
+  displayName: string;
+  specimenNo?: string;
+  selectedStrategy: MergeStrategy;
+  manualMergedData?: Box | Specimen | CollectionBatch | null;
+}
+
+export interface DiffAnalysisResult {
+  items: DiffItem[];
+  stats: {
+    total: number;
+    newInBackup: number;
+    deletedInBackup: number;
+    idConflicts: number;
+    specimenNoConflicts: number;
+    fieldInconsistent: number;
+    missingBoxRefs: number;
+    missingBatchRefs: number;
+  };
+  hasConflicts: boolean;
+}
+
+export interface MergeResult {
+  success: boolean;
+  message: string;
+  stats: {
+    boxesAdded: number;
+    boxesUpdated: number;
+    boxesDeleted: number;
+    specimensAdded: number;
+    specimensUpdated: number;
+    specimensDeleted: number;
+    batchesAdded: number;
+    batchesUpdated: number;
+    batchesDeleted: number;
+    skipped: number;
+  };
+  snapshot: {
+    boxes: Box[];
+    specimens: Specimen[];
+    batches: CollectionBatch[];
+  };
+}
+
+export interface MergeSnapshot {
+  boxes: Box[];
+  specimens: Specimen[];
+  batches: CollectionBatch[];
+  timestamp?: string;
+  description?: string;
+}

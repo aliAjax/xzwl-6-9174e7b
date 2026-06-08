@@ -1,4 +1,4 @@
-import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight, Database, Printer } from 'lucide-react';
+import { Bug, Plus, Package, ClipboardList, Hash, Camera, ArrowLeft, Download, Upload, MoveRight, Database, Printer, GitMerge } from 'lucide-react';
 
 type ViewMode = 'main' | 'photography';
 
@@ -13,6 +13,7 @@ interface HeaderProps {
   onOpenImport: () => void;
   onOpenTransfer: () => void;
   onOpenBackupRestore: () => void;
+  onOpenDiffMerge: () => void;
   onOpenLabelPrint: () => void;
   onBackToMain: () => void;
 }
@@ -28,6 +29,7 @@ export function Header({
   onOpenImport,
   onOpenTransfer,
   onOpenBackupRestore,
+  onOpenDiffMerge,
   onOpenLabelPrint,
   onBackToMain,
 }: HeaderProps) {
@@ -103,6 +105,14 @@ export function Header({
                 >
                   <Database className="w-4 h-4" />
                   <span className="hidden sm:inline">备份恢复</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenDiffMerge}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-700 hover:bg-blue-600 rounded-md transition-colors duration-200 text-sm font-medium"
+                >
+                  <GitMerge className="w-4 h-4" />
+                  <span className="hidden sm:inline">差异合并</span>
                 </button>
                 <button
                   type="button"

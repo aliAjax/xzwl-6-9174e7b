@@ -15,6 +15,7 @@ import { ExportModal } from './components/ExportModal';
 import { ImportPreviewModal } from './components/ImportPreviewModal';
 import { BoxTransferModal } from './components/BoxTransferModal';
 import { BackupRestoreModal } from './components/BackupRestoreModal';
+import { BackupDiffMergeModal } from './components/BackupDiffMergeModal';
 import { LabelPrintModal } from './components/LabelPrintModal';
 import { Bug, ArrowLeft } from 'lucide-react';
 
@@ -76,6 +77,7 @@ function App() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [backupRestoreModalOpen, setBackupRestoreModalOpen] = useState(false);
+  const [diffMergeModalOpen, setDiffMergeModalOpen] = useState(false);
   const [labelPrintModalOpen, setLabelPrintModalOpen] = useState(false);
 
   const filteredSpecimens = useMemo(() => {
@@ -177,6 +179,7 @@ function App() {
         onOpenImport={() => setImportModalOpen(true)}
         onOpenTransfer={() => setTransferModalOpen(true)}
         onOpenBackupRestore={() => setBackupRestoreModalOpen(true)}
+        onOpenDiffMerge={() => setDiffMergeModalOpen(true)}
         onOpenLabelPrint={() => setLabelPrintModalOpen(true)}
         onBackToMain={() => setViewMode('main')}
       />
@@ -326,6 +329,17 @@ function App() {
       <BackupRestoreModal
         isOpen={backupRestoreModalOpen}
         onClose={() => setBackupRestoreModalOpen(false)}
+        boxes={boxes}
+        specimens={specimens}
+        batches={batches}
+        setBoxes={setBoxes}
+        setSpecimens={setSpecimens}
+        setBatches={setBatches}
+      />
+
+      <BackupDiffMergeModal
+        isOpen={diffMergeModalOpen}
+        onClose={() => setDiffMergeModalOpen(false)}
         boxes={boxes}
         specimens={specimens}
         batches={batches}
