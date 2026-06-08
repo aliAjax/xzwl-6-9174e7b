@@ -439,3 +439,44 @@ export interface NumberTemplatePreset {
   createdAt: string;
   updatedAt: string;
 }
+
+export type PhotographySessionStatus = 'active' | 'completed' | 'cancelled';
+
+export interface PhotographySessionTarget {
+  type: 'box' | 'batch' | 'highRisk';
+  id: string;
+  name: string;
+}
+
+export interface PhotographySession {
+  id: string;
+  name: string;
+  priority: PhotographyGroupPriority;
+  notes: string;
+  scheduledDate: string;
+  status: PhotographySessionStatus;
+  targets: PhotographySessionTarget[];
+  specimenIds: string[];
+  completedCount: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface PhotographySessionFormData {
+  name: string;
+  priority: PhotographyGroupPriority;
+  notes: string;
+  scheduledDate: string;
+  targets: PhotographySessionTarget[];
+}
+
+export interface PhotographySessionExportRow {
+  specimenNo: string;
+  species: string;
+  boxName: string;
+  batchName: string;
+  complianceStatus: string;
+  notes: string;
+  photographed: boolean;
+}

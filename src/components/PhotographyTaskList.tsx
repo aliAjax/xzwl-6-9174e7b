@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Package,
   MapPin,
@@ -15,6 +15,11 @@ import {
   X,
   AlertOctagon,
   Layers,
+  ArrowLeft,
+  Plus,
+  Download,
+  CheckSquare,
+  Clock,
 } from 'lucide-react';
 import type {
   Box,
@@ -23,10 +28,15 @@ import type {
   PhotographyGroupMetadata,
   PhotographyGroupPriority,
   ComplianceStatus,
+  PhotographySession,
+  PhotographySessionFormData,
+  PhotographySessionTarget,
 } from '../types';
 import { HIGH_RISK_STATUSES, COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { formatDate } from '../utils/helpers';
+import { PhotographySessionList } from './PhotographySessionList';
+import { PhotographySessionModal } from './PhotographySessionModal';
 
 interface PhotographyTaskListProps {
   specimens: Specimen[];
@@ -34,7 +44,30 @@ interface PhotographyTaskListProps {
   batches: CollectionBatch[];
   onTogglePhotographed: (id: string) => void;
   onMarkPhotographed: (ids: string[]) => void;
+  sessions: PhotographySession[];
+  activeSessions: PhotographySession[];
+  completedSessions: PhotographySession[];
+  cancelledSessions: PhotographySession[];
+  getSessionProgress: (id: string) => { total: number; completed: number; percentage: number };
+  getSessionSpecimens: (id: string) => Specimen[];
+  getAvailableTargets: () => {
+    boxes: { id: string; name: string; count: number }[];
+    batches: { id: string; name: string; count: number }[];
+    highRisk: { id: string; name: string; count: number }[];
+  };
+  getSpecimensForTargets: (targets: PhotographySessionTarget[]) => Specimen[];
+  onCreateSession: (data: PhotographySessionFormData) => void;
+  onUpdateSession: (id: string, data: Partial<PhotographySessionFormData>) => void;
+  onDeleteSession: (id: string) => void;
+  onCompleteSession: (id: string) => void;
+  onCancelSession: (id: string) => void;
+  onReactiveSession: (id: string) => void;
+  onExportSession: (id: string) => void;
+  updateAllSessionsProgress: () => void;
+  updateSessionProgress: (id: string) => void;
 }
+
+type PhotographyViewMode = 'groups' | 'sessions' | 'sessionDetail';
 
 type GroupBy = 'box' | 'location' | 'batch' | 'highRisk' | 'unassignedBox';
 
@@ -70,7 +103,26 @@ export function PhotographyTaskList({
   batches,
   onTogglePhotographed,
   onMarkPhotographed,
+  sessions,
+  activeSessions,
+  completedSessions,
+  cancelledSessions,
+  getSessionProgress,
+  getSessionSpecimens,
+  getAvailableTargets,
+  getSpecimensForTargets,
+  onCreateSession,
+  onUpdateSession,
+  onDeleteSession,
+  onCompleteSession,
+  onCancelSession,
+  onReactiveSession,
+  onExportSession,
+  updateAllSessionsProgress,
+  updateSessionProgress,
 }: PhotographyTaskListProps) {
+  const [viewMode, setViewMode] = useState<PhotographyViewMode>('groups');
+  const [selectedSession, setSelectedSession] = useState<PhotographySession | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('box');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -81,6 +133,50 @@ export function PhotographyTaskList({
   const [editingGroup, setEditingGroup] = useState<{ groupKey: string; groupBy: GroupBy } | null>(null);
   const [editPriority, setEditPriority] = useState<PhotographyGroupPriority>('medium');
   const [editNotes, setEditNotes] = useState('');
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [editingSession, setEditingSession] = useState<PhotographySession | null>(null);
+
+  useEffect(() => {
+    updateAllSessionsProgress();
+  }, [specimens, updateAllSessionsProgress]);
+
+  const handleViewSession = (session: PhotographySession) => {
+    setSelectedSession(session);
+    updateSessionProgress(session.id);
+    setViewMode('sessionDetail');
+  };
+
+  const handleEditSession = (session: PhotographySession) => {
+    setEditingSession(session);
+    setSessionModalOpen(true);
+  };
+
+  const handleNewSession = () => {
+    setEditingSession(null);
+    setSessionModalOpen(true);
+  };
+
+  const handleSessionSubmit = (data: PhotographySessionFormData) => {
+    if (editingSession) {
+      onUpdateSession(editingSession.id, data);
+    } else {
+      onCreateSession(data);
+    }
+  };
+
+  const handleBackToSessions = () => {
+    setSelectedSession(null);
+    setViewMode('sessions');
+  };
+
+  const sessionDetailSpecimens = useMemo(() => {
+    if (!selectedSession) return [];
+    return getSessionSpecimens(selectedSession.id);
+  }, [selectedSession, getSessionSpecimens]);
+
+  const sessionDetailUnphotographed = useMemo(() => {
+    return sessionDetailSpecimens.filter((s) => !s.photographed);
+  }, [sessionDetailSpecimens]);
 
   const unphotographedSpecimens = useMemo(() => {
     return specimens.filter((s) => !s.photographed);
@@ -443,12 +539,336 @@ export function PhotographyTaskList({
     );
   };
 
+  const renderSpecimenCard = (specimen: Specimen, idx: number, showAllInfo: boolean = false) => {
+    const isSelected = selectedIds.has(specimen.id);
+    const box = specimen.boxId ? getBoxById(specimen.boxId) : null;
+    const batch = specimen.batchId ? getBatchById(specimen.batchId) : null;
+    const complianceInfo = getComplianceStatusInfo(specimen.complianceStatus);
+    const isHighRisk = HIGH_RISK_STATUSES.includes(specimen.complianceStatus);
+
+    return (
+      <div
+        key={specimen.id}
+        className={`card p-4 opacity-0 animate-fade-in-up ${isSelected ? 'ring-2 ring-oak-500' : ''} ${isHighRisk ? 'border-l-4 border-l-red-400' : ''} ${specimen.photographed ? 'opacity-60' : ''}`}
+        style={{ animationDelay: `${idx * 0.03}s` }}
+      >
+        <div className="flex items-start gap-3">
+          <button
+            type="button"
+            onClick={() => toggleSelectSpecimen(specimen.id)}
+            className="mt-1 flex-shrink-0"
+          >
+            <div
+              className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected
+                  ? 'bg-oak-700 border-oak-700'
+                  : 'border-oak-300 hover:border-oak-500'
+                }`}
+            >
+              {isSelected && (
+                <Check className="w-3.5 h-3.5 text-parchment-500" />
+              )}
+            </div>
+          </button>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <span className="inline-block px-2 py-1 bg-oak-100 text-oak-700 text-xs font-mono rounded">
+                {specimen.specimenNo}
+              </span>
+              {isHighRisk && (
+                <span
+                  className={`inline-block px-2 py-1 text-xs font-medium rounded ${complianceInfo.bgColor} ${complianceInfo.color}`}
+                >
+                  {complianceInfo.label}
+                </span>
+              )}
+              {specimen.photographed && (
+                <span className="inline-block px-2 py-1 bg-moss-100 text-moss-700 text-xs font-medium rounded">
+                  已拍照
+                </span>
+              )}
+            </div>
+            <h4 className="font-semibold text-oak-900 font-serif leading-tight mb-2">
+              {specimen.species || (
+                <span className="text-oak-400 italic">待鉴定物种...</span>
+              )}
+            </h4>
+            <div className="space-y-1 text-sm text-oak-600">
+              <div className="flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
+                <span className="truncate">
+                  {specimen.collectionLocation || (
+                    <span className="text-oak-400 italic">未填写</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
+                <span>{formatDate(specimen.collectionDate)}</span>
+              </div>
+              {(showAllInfo || groupBy !== 'box' && groupBy !== 'unassignedBox') && box && (
+                <div className="flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
+                  <span className="truncate">{box.name}</span>
+                </div>
+              )}
+              {(showAllInfo || groupBy !== 'batch') && batch && (
+                <div className="flex items-center gap-1.5">
+                  <ClipboardList className="w-3.5 h-3.5 text-moss-500 flex-shrink-0" />
+                  <span className="truncate font-medium text-moss-700">
+                    {batch.name}
+                  </span>
+                </div>
+              )}
+            </div>
+            {specimen.notes && (
+              <p className="text-xs text-oak-500 mt-2 line-clamp-2 italic">
+                "{specimen.notes}"
+              </p>
+            )}
+            {!specimen.photographed && (
+              <div className="mt-3 pt-3 border-t border-oak-100">
+                <button
+                  type="button"
+                  onClick={() => onTogglePhotographed(specimen.id)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-rust-100 text-rust-700 rounded-md text-sm font-medium hover:bg-rust-200 transition-colors"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  标记为已拍照
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (viewMode === 'sessionDetail' && selectedSession) {
+    const sessionProgress = getSessionProgress(selectedSession.id);
+    const sessionPriorityInfo = PRIORITY_OPTIONS.find(opt => opt.value === selectedSession.priority);
+
+    return (
+      <div className="space-y-6">
+        <div className="card p-6 animate-fade-in-up">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={handleBackToSessions}
+                className="mt-1 text-oak-500 hover:text-oak-700 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+              <div>
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <h2 className="text-xl font-semibold text-oak-800 font-serif">{selectedSession.name}</h2>
+                  {sessionPriorityInfo && (
+                    <span className={`tag ${sessionPriorityInfo.bgColor} ${sessionPriorityInfo.color} border ${sessionPriorityInfo.borderColor} flex items-center gap-1`}>
+                      <Flag className="w-3 h-3" />
+                      {sessionPriorityInfo.label}
+                    </span>
+                  )}
+                  <span className={`tag ${selectedSession.status === 'active' ? 'bg-moss-100 text-moss-700' : selectedSession.status === 'completed' ? 'bg-oak-100 text-oak-700' : 'bg-red-100 text-red-700'}`}>
+                    {selectedSession.status === 'active' ? '进行中' : selectedSession.status === 'completed' ? '已完成' : '已取消'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 text-sm text-oak-500 flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-4 h-4" />
+                    预计: {formatDate(selectedSession.scheduledDate)}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-4 h-4" />
+                    创建: {formatDate(selectedSession.createdAt)}
+                  </span>
+                </div>
+                {selectedSession.notes && (
+                  <p className="text-sm text-oak-600 mt-2 flex items-center gap-1">
+                    <StickyNote className="w-4 h-4 text-oak-400" />
+                    <span className="italic">"{selectedSession.notes}"</span>
+                  </p>
+                )}
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-oak-600">
+                      进度: {sessionProgress.completed}/{sessionProgress.total} 件
+                    </span>
+                    <span className="font-medium text-oak-700">{sessionProgress.percentage}%</span>
+                  </div>
+                  <div className="h-2 bg-oak-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-moss-500 to-moss-600 rounded-full transition-all duration-500"
+                      style={{ width: `${sessionProgress.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => onExportSession(selectedSession.id)}
+                className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" />
+                导出清单
+              </button>
+              {selectedSession.status === 'active' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleEditSession(selectedSession)}
+                    className="btn-secondary text-sm py-1.5 px-3 flex items-center gap-1.5"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    编辑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm(`确定完成会话"${selectedSession.name}"吗？剩余 ${sessionDetailUnphotographed.length} 件未拍照的标本将被标记为已拍照。`)) {
+                        onCompleteSession(selectedSession.id);
+                      }
+                    }}
+                    className="bg-moss-600 hover:bg-moss-700 text-parchment-50 text-sm py-1.5 px-3 rounded-md flex items-center gap-1.5 transition-colors"
+                  >
+                    <CheckSquare className="w-3.5 h-3.5" />
+                    完成会话
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="card p-4 animate-fade-in-up">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-oak-800 font-serif">标本列表</h3>
+              <p className="text-sm text-oak-500 mt-1">
+                共 {sessionDetailSpecimens.length} 件 · 待拍照 {sessionDetailUnphotographed.length} 件
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const unphotographedIds = sessionDetailUnphotographed.map(s => s.id);
+                  if (selectedIds.size === unphotographedIds.length) {
+                    setSelectedIds(new Set());
+                  } else {
+                    setSelectedIds(new Set(unphotographedIds));
+                  }
+                }}
+                className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+              >
+                {selectedIds.size === sessionDetailUnphotographed.length ? '取消全选' : '全选待拍'}
+              </button>
+              <button
+                type="button"
+                onClick={handleMarkSelected}
+                disabled={selectedIds.size === 0}
+                className={`btn-primary flex items-center gap-2 text-sm py-1.5 px-3 ${selectedIds.size === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <Check className="w-4 h-4" />
+                标记选中为已拍照
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {sessionDetailSpecimens.map((specimen, idx) => renderSpecimenCard(specimen, idx, true))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (viewMode === 'sessions') {
+    return (
+      <div className="space-y-6">
+        <div className="card p-6 animate-fade-in-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-moss-100 flex items-center justify-center">
+                <ClipboardList className="w-6 h-6 text-moss-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-oak-800 font-serif">拍摄会话</h2>
+                <p className="text-sm text-oak-500 mt-1">
+                  共 {sessions.length} 个会话 · 进行中 {activeSessions.length} 个
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setViewMode('groups')}
+                className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+              >
+                查看分组视图
+              </button>
+              <button
+                type="button"
+                onClick={handleNewSession}
+                className="btn-primary flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                新建会话
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <PhotographySessionList
+          sessions={sessions}
+          activeSessions={activeSessions}
+          completedSessions={completedSessions}
+          cancelledSessions={cancelledSessions}
+          getSessionProgress={getSessionProgress}
+          onViewSession={handleViewSession}
+          onEditSession={handleEditSession}
+          onExportSession={onExportSession}
+          onCompleteSession={onCompleteSession}
+          onCancelSession={onCancelSession}
+          onReactiveSession={onReactiveSession}
+          onDeleteSession={onDeleteSession}
+        />
+      </div>
+    );
+  }
+
   if (unphotographedSpecimens.length === 0) {
     return (
-      <div className="card p-16 text-center animate-fade-in-up">
-        <Camera className="w-20 h-20 text-moss-300 mx-auto mb-4" />
-        <h3 className="text-xl font-semibold text-oak-700 font-serif mb-2">太棒了！所有标本都已拍照</h3>
-        <p className="text-oak-500">暂无待拍照的标本任务</p>
+      <div className="space-y-6">
+        <div className="card p-6 animate-fade-in-up">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-lg bg-rust-100 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-rust-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-oak-800 font-serif">拍照工作台</h2>
+                <p className="text-sm text-oak-500 mt-1">
+                  共 <span className="font-semibold text-rust-600">{unphotographedSpecimens.length}</span> 件标本待拍照
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setViewMode('sessions')}
+                className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+              >
+                查看拍摄会话 ({sessions.length})
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="card p-16 text-center animate-fade-in-up">
+          <Camera className="w-20 h-20 text-moss-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-oak-700 font-serif mb-2">太棒了！所有标本都已拍照</h3>
+          <p className="text-oak-500">暂无待拍照的标本任务</p>
+        </div>
       </div>
     );
   }
@@ -463,7 +883,7 @@ export function PhotographyTaskList({
             </div>
             <div>
               <h2 className="text-xl font-semibold text-oak-800 font-serif">拍照工作台</h2>
-              <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <p className="text-sm text-oak-500">
                   共{' '}
                   <span className="font-semibold text-rust-600">{unphotographedSpecimens.length}</span>{' '}
@@ -479,6 +899,13 @@ export function PhotographyTaskList({
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setViewMode('sessions')}
+              className="text-sm text-oak-600 hover:text-oak-800 font-medium"
+            >
+              拍摄会话 ({sessions.length})
+            </button>
             <div className="flex items-center gap-2">
               <span className="text-sm text-oak-600">分组方式：</span>
               <div className="flex flex-wrap rounded-md overflow-hidden border border-oak-300">
@@ -644,102 +1071,7 @@ export function PhotographyTaskList({
                 {isExpanded && (
                   <div className="border-t border-oak-100">
                     <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {group.specimens.map((specimen, idx) => {
-                        const isSelected = selectedIds.has(specimen.id);
-                        const box = specimen.boxId ? getBoxById(specimen.boxId) : null;
-                        const batch = specimen.batchId ? getBatchById(specimen.batchId) : null;
-                        const complianceInfo = getComplianceStatusInfo(specimen.complianceStatus);
-                        const isHighRisk = HIGH_RISK_STATUSES.includes(specimen.complianceStatus);
-
-                        return (
-                          <div
-                            key={specimen.id}
-                            className={`card p-4 opacity-0 animate-fade-in-up ${isSelected ? 'ring-2 ring-oak-500' : ''} ${isHighRisk ? 'border-l-4 border-l-red-400' : ''}`}
-                            style={{ animationDelay: `${idx * 0.03}s` }}
-                          >
-                            <div className="flex items-start gap-3">
-                              <button
-                                type="button"
-                                onClick={() => toggleSelectSpecimen(specimen.id)}
-                                className="mt-1 flex-shrink-0"
-                              >
-                                <div
-                                  className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isSelected
-                                      ? 'bg-oak-700 border-oak-700'
-                                      : 'border-oak-300 hover:border-oak-500'
-                                    }`}
-                                >
-                                  {isSelected && (
-                                    <Check className="w-3.5 h-3.5 text-parchment-500" />
-                                  )}
-                                </div>
-                              </button>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                  <span className="inline-block px-2 py-1 bg-oak-100 text-oak-700 text-xs font-mono rounded">
-                                    {specimen.specimenNo}
-                                  </span>
-                                  {isHighRisk && (
-                                    <span
-                                      className={`inline-block px-2 py-1 text-xs font-medium rounded ${complianceInfo.bgColor} ${complianceInfo.color}`}
-                                    >
-                                      {complianceInfo.label}
-                                    </span>
-                                  )}
-                                </div>
-                                <h4 className="font-semibold text-oak-900 font-serif leading-tight mb-2">
-                                  {specimen.species || (
-                                    <span className="text-oak-400 italic">待鉴定物种...</span>
-                                  )}
-                                </h4>
-                                <div className="space-y-1 text-sm text-oak-600">
-                                  <div className="flex items-center gap-1.5">
-                                    <MapPin className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
-                                    <span className="truncate">
-                                      {specimen.collectionLocation || (
-                                        <span className="text-oak-400 italic">未填写</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
-                                    <span>{formatDate(specimen.collectionDate)}</span>
-                                  </div>
-                                  {box && groupBy !== 'box' && groupBy !== 'unassignedBox' && (
-                                    <div className="flex items-center gap-1.5">
-                                      <Package className="w-3.5 h-3.5 text-oak-400 flex-shrink-0" />
-                                      <span className="truncate">{box.name}</span>
-                                    </div>
-                                  )}
-                                  {batch && groupBy !== 'batch' && (
-                                    <div className="flex items-center gap-1.5">
-                                      <ClipboardList className="w-3.5 h-3.5 text-moss-500 flex-shrink-0" />
-                                      <span className="truncate font-medium text-moss-700">
-                                        {batch.name}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                                {specimen.notes && (
-                                  <p className="text-xs text-oak-500 mt-2 line-clamp-2 italic">
-                                    "{specimen.notes}"
-                                  </p>
-                                )}
-                                <div className="mt-3 pt-3 border-t border-oak-100">
-                                  <button
-                                    type="button"
-                                    onClick={() => onTogglePhotographed(specimen.id)}
-                                    className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 bg-rust-100 text-rust-700 rounded-md text-sm font-medium hover:bg-rust-200 transition-colors"
-                                  >
-                                    <Camera className="w-3.5 h-3.5" />
-                                    标记为已拍照
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                      {group.specimens.map((specimen, idx) => renderSpecimenCard(specimen, idx))}
                     </div>
                   </div>
                 )}
@@ -816,6 +1148,15 @@ export function PhotographyTaskList({
           </div>
         </div>
       )}
+
+      <PhotographySessionModal
+        isOpen={sessionModalOpen}
+        onClose={() => setSessionModalOpen(false)}
+        onSubmit={handleSessionSubmit}
+        editingSession={editingSession}
+        availableTargets={getAvailableTargets()}
+        getSpecimensForTargets={getSpecimensForTargets}
+      />
     </div>
   );
 }

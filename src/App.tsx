@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import type { Box, Specimen, SpecimenFormData, Filters } from './types';
 import { HIGH_RISK_STATUSES } from './types';
 import { useSpecimens } from './hooks/useSpecimens';
+import { usePhotographySessions } from './hooks/usePhotographySessions';
 import { Header } from './components/Header';
 import { StatsCard } from './components/StatsCard';
 import { FilterBar } from './components/FilterBar';
@@ -58,6 +59,26 @@ function App() {
     checkSpecimenNoExists,
     addSpecimensBatch,
   } = useSpecimens();
+
+  const {
+    sessions,
+    activeSessions,
+    completedSessions,
+    cancelledSessions,
+    createSession,
+    updateSession,
+    deleteSession,
+    completeSession,
+    cancelSession,
+    reactiveSession,
+    getSessionSpecimens,
+    getSessionProgress,
+    exportSessionChecklist,
+    updateSessionProgress,
+    updateAllSessionsProgress,
+    getSpecimensForTargets,
+    getAvailableTargets,
+  } = usePhotographySessions(specimens, boxes, batches, markPhotographed);
 
   const [viewMode, setViewMode] = useState<ViewMode>('main');
 
@@ -204,6 +225,23 @@ function App() {
               batches={batches}
               onTogglePhotographed={togglePhotographed}
               onMarkPhotographed={(ids) => markPhotographed(ids, true)}
+              sessions={sessions}
+              activeSessions={activeSessions}
+              completedSessions={completedSessions}
+              cancelledSessions={cancelledSessions}
+              getSessionProgress={getSessionProgress}
+              getSessionSpecimens={getSessionSpecimens}
+              getAvailableTargets={getAvailableTargets}
+              getSpecimensForTargets={getSpecimensForTargets}
+              onCreateSession={createSession}
+              onUpdateSession={updateSession}
+              onDeleteSession={deleteSession}
+              onCompleteSession={completeSession}
+              onCancelSession={cancelSession}
+              onReactiveSession={reactiveSession}
+              onExportSession={exportSessionChecklist}
+              updateAllSessionsProgress={updateAllSessionsProgress}
+              updateSessionProgress={updateSessionProgress}
             />
           </div>
         ) : (
