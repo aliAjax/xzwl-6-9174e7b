@@ -396,3 +396,15 @@ export const BATCH_EDIT_FIELD_LABELS: Record<BatchEditField, string> = {
   batchId: '所属采集批次',
   complianceStatus: '合规状态',
 };
+
+export interface NumberTemplatePreset {
+  id: string;
+  name: string;
+  orderPrefix: string;
+  customPrefix: string;
+  numberPadding: number;
+  defaultBoxId: string;
+  defaultCollectionDate: string;
+  createdAt: string;
+  updatedAt: string;
+}
