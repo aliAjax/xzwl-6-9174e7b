@@ -3,6 +3,7 @@ import { X, Printer, FileText, Search, Check, Filter, AlertTriangle, Grid3X3, La
 import type { Box, Specimen, CollectionBatch, Filters, LabelTemplateType, PaperSizeType, LabelPrintSettings, SpecimenLabelData, LabelFieldCheckResult } from '../types';
 import { LABEL_TEMPLATES, PAPER_SIZES } from '../types';
 import { formatDate, getSpecimenLabelData, batchCheckLabelFields, generateLabelPages, getPrintStyles } from '../utils/helpers';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface LabelPrintModalProps {
   isOpen: boolean;
@@ -51,7 +52,7 @@ export function LabelPrintModal({
   const [showFieldCheck, setShowFieldCheck] = useState(false);
   const [showFieldCompletionAlert, setShowFieldCompletionAlert] = useState(false);
   const [pendingNextStep, setPendingNextStep] = useState<'settings' | 'preview' | null>(null);
-  const [settings, setSettings] = useState<LabelPrintSettings>({
+  const [settings, setSettings] = useLocalStorage<LabelPrintSettings>('label-print-settings', {
     templateType: 'pin',
     paperSize: 'A4',
     showGrid: true,
@@ -88,6 +89,18 @@ export function LabelPrintModal({
   }, [specimens, selectedSpecimenIds]);
 
   const hasActiveFilters = currentFilters.search || currentFilters.onlyUnphotographed || currentFilters.boxId || currentFilters.batchId;
+
+  useEffect(() => {
+    if (isOpen) {
+      setStep('select');
+      setSelectedSpecimenIds(new Set());
+      setSearchQuery('');
+      setBoxFilter('');
+      setShowFieldCheck(false);
+      setShowFieldCompletionAlert(false);
+      setPendingNextStep(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (selectedSpecimens.length > 0) {
@@ -141,12 +154,8 @@ export function LabelPrintModal({
     setSearchQuery('');
     setBoxFilter('');
     setShowFieldCheck(false);
-    setSettings({
-      templateType: 'pin',
-      paperSize: 'A4',
-      showGrid: true,
-      fontSize: 'small',
-    });
+    setShowFieldCompletionAlert(false);
+    setPendingNextStep(null);
     onClose();
   };
 
