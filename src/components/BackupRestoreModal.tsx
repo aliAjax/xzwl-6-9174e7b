@@ -1,7 +1,8 @@
 import { useState, useCallback, useMemo } from 'react';
 import { X, Download, Upload, Database, AlertTriangle, CheckCircle, XCircle, FileJson, Archive, RefreshCw, Merge, Trash2, Info, ArrowLeft, Check } from 'lucide-react';
 import type { Box, Specimen, CollectionBatch, RestorePreviewData, RestoreOptions, RestoreResult, RestoreMode } from '../types';
-import { exportBackup, readFileAsText, parseBackupFile, generateRestorePreview, performRestore } from '../utils/helpers';
+import { readFileAsText } from '../utils/common';
+import { exportBackup, parseBackupFile, generateRestorePreview, performRestore } from '../utils/backup';
 
 interface BackupRestoreModalProps {
   isOpen: boolean;

@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect } from 'react';
 import { X, Printer, FileText, Search, Check, Filter, AlertTriangle, Grid3X3, LayoutGrid, Settings, Eye } from 'lucide-react';
 import type { Box, Specimen, CollectionBatch, Filters, LabelTemplateType, PaperSizeType, LabelPrintSettings, SpecimenLabelData, LabelFieldCheckResult } from '../types';
 import { LABEL_TEMPLATES, PAPER_SIZES } from '../types';
-import { formatDate, getSpecimenLabelData, batchCheckLabelFields, generateLabelPages, getPrintStyles } from '../utils/helpers';
+import { formatDate } from '../utils/common';
+import { getSpecimenLabelData, batchCheckLabelFields, generateLabelPages, getPrintStyles } from '../utils/labelPrint';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface LabelPrintModalProps {

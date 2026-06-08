@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react';
 import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine, Package, Layers, Plus, Info, Edit3, Save, RotateCcw, ChevronDown } from 'lucide-react';
 import type { Box, Specimen, CollectionBatch, ImportPreviewData, SpecimenFormData, BoxFormData, CollectionBatchFormData, CsvFieldMapping, CsvRowData } from '../types';
-import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData, createBoxFormData, createBatchFormData, revalidatePreviewData } from '../utils/helpers';
+import { readFileAsText } from '../utils/common';
+import { validateAndPreviewCsv, convertToSpecimenFormData, createBoxFormData, createBatchFormData, revalidatePreviewData } from '../utils/csv';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;

@@ -10,11 +10,12 @@ import type {
   MergeResult, DiffItemType, ReferenceRepairAction
 } from '../types';
 import { COMPLIANCE_STATUS_OPTIONS } from '../types';
+import { readFileAsText } from '../utils/common';
+import { parseBackupFile, checkCompatibility } from '../utils/backup';
 import {
-  readFileAsText, parseBackupFile, checkCompatibility, analyzeDifferences,
-  performDiffMerge, restoreFromSnapshot, getConflictTypeLabel,
+  analyzeDifferences, performDiffMerge, restoreFromSnapshot, getConflictTypeLabel,
   getConflictTypeColor, getTypeLabel
-} from '../utils/helpers';
+} from '../utils/diffMerge';
 
 interface BackupDiffMergeModalProps {
   isOpen: boolean;
