@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   migrate?: (data: any) => T
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const [storedValue, setStoredValue] = useState<T>(() => {

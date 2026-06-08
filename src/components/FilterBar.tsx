@@ -1,6 +1,5 @@
-import { Search, X, AlertTriangle } from 'lucide-react';
-import type { Box, Filters, CollectionBatch, ComplianceStatus } from '../types';
-import { COMPLIANCE_STATUS_OPTIONS } from '../types';
+import { Search, X } from 'lucide-react';
+import type { Box, Filters, CollectionBatch } from '../types';
 
 interface FilterBarProps {
   filters: Filters;
@@ -32,10 +31,12 @@ export function FilterBar({ filters, onFiltersChange, boxes, batches }: FilterBa
       onlyUnphotographed: false,
       boxId: '',
       batchId: '',
+      complianceStatus: '',
+      onlyHighRisk: false,
     });
   };
 
-  const hasActiveFilters = filters.search || filters.onlyUnphotographed || filters.boxId || filters.batchId;
+  const hasActiveFilters = filters.search || filters.onlyUnphotographed || filters.boxId || filters.batchId || filters.complianceStatus || filters.onlyHighRisk;
 
   return (
     <div className="bg-parchment-50 border border-oak-200 rounded-xl p-4 shadow-card">

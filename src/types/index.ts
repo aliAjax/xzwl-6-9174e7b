@@ -24,14 +24,6 @@ export interface CollectionBatch {
   createdAt: string;
 }
 
-export type ComplianceStatus = 
-  | 'not_relevant'
-  | 'protected_species'
-  | 'invasive_species'
-  | 'special_permit'
-  | 'expired_permit'
-  | 'unknown';
-
 export const COMPLIANCE_STATUS_OPTIONS: { value: ComplianceStatus; label: string; color: string; bgColor: string; borderColor: string; description: string }[] = [
   { value: 'not_relevant', label: '无需合规', color: 'text-oak-600', bgColor: 'bg-oak-100', borderColor: 'border-oak-300', description: '普通物种，无需特殊许可' },
   { value: 'protected_species', label: '保护物种', color: 'text-amber-700', bgColor: 'bg-amber-100', borderColor: 'border-amber-300', description: '国家或地方保护动物' },

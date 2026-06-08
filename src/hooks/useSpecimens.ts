@@ -1,8 +1,9 @@
 import { useCallback } from 'react';
 import type { Box, Specimen, SpecimenFormData, BoxFormData, CollectionBatch, CollectionBatchFormData, BoxTransferData } from '../types';
+import { HIGH_RISK_STATUSES } from '../types';
 import { useLocalStorage } from './useLocalStorage';
 import { mockBoxes, mockSpecimens, mockBatches } from '../data/mockData';
-import { generateId, migrateSpecimenData, isHighRiskCompliance } from '../utils/helpers';
+import { generateId } from '../utils/helpers';
 
 const BOXES_KEY = 'insect_boxes';
 const SPECIMENS_KEY = 'insect_specimens';
@@ -176,6 +177,10 @@ export function useSpecimens() {
     unphotographed: specimens.filter(s => !s.photographed).length,
     totalBoxes: boxes.length,
     totalBatches: batches.length,
+    highRiskCount: specimens.filter(s => HIGH_RISK_STATUSES.includes(s.complianceStatus)).length,
+    protectedCount: specimens.filter(s => s.complianceStatus === 'protected_species').length,
+    invasiveCount: specimens.filter(s => s.complianceStatus === 'invasive_species').length,
+    permitExpiredCount: specimens.filter(s => s.complianceStatus === 'expired_permit').length,
   };
 
   return {

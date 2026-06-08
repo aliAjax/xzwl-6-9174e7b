@@ -1,6 +1,6 @@
-import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList, FileEdit, AlertTriangle, Shield, Clock } from 'lucide-react';
-import type { Specimen, CollectionBatch, ComplianceStatus } from '../types';
-import { COMPLIANCE_STATUS_OPTIONS, HIGH_RISK_STATUSES } from '../types';
+import { Camera, Pin, MapPin, Calendar, Edit2, Trash2, ClipboardList, FileEdit, Shield, Clock } from 'lucide-react';
+import type { Specimen, CollectionBatch } from '../types';
+import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import { formatDate } from '../utils/helpers';
 
 interface SpecimenCardProps {
@@ -27,6 +27,12 @@ export function SpecimenCard({
   };
 
   const isDraft = !specimen.species.trim();
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const sAny = specimen as any;
+  const permitNumber = sAny.permitNumber ?? '';
+  const permitExpiryDate = sAny.permitExpiryDate ?? '';
+  const complianceStatus = sAny.complianceStatus ?? 'not_relevant';
 
   return (
     <div
@@ -108,6 +114,43 @@ export function SpecimenCard({
         <p className="text-sm text-oak-500 mb-4 line-clamp-2 italic">
           "{specimen.notes}"
         </p>
+      )}
+
+      {complianceStatus && complianceStatus !== 'not_relevant' && (
+        <div className="mb-4">
+          {(() => {
+            const statusOption = COMPLIANCE_STATUS_OPTIONS.find(opt => opt.value === complianceStatus);
+            if (!statusOption) return null;
+            return (
+              <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${statusOption.bgColor} ${statusOption.color} border ${statusOption.borderColor}`}>
+                <Shield className="w-3 h-3" />
+                {statusOption.label}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {(permitNumber || permitExpiryDate) && (
+        <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+          <div className="flex items-center gap-2 text-xs text-blue-700 font-medium mb-2">
+            <Shield className="w-4 h-4" />
+            许可证信息
+          </div>
+          {permitNumber && (
+            <div className="flex items-center gap-2 text-sm text-blue-600 mb-1">
+              <span className="text-blue-400">编号:</span>
+              <span className="font-mono">{permitNumber}</span>
+            </div>
+          )}
+          {permitExpiryDate && (
+            <div className="flex items-center gap-2 text-sm text-blue-600">
+              <Clock className="w-3 h-3 text-blue-400" />
+              <span className="text-blue-400">有效期至:</span>
+              <span>{formatDate(permitExpiryDate)}</span>
+            </div>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-2 flex-wrap pt-3 border-t border-oak-100">

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
-import type { Box, Specimen, SpecimenFormData, CollectionBatch } from '../types';
-import { COMPLIANCE_STATUS_OPTIONS } from '../types';
+import type { Box, Specimen, SpecimenFormData, CollectionBatch, ComplianceStatus } from '../types';
+import { DEFAULT_COMPLIANCE_STATUS } from '../types';
 import { getTodayString } from '../utils/helpers';
 
 interface SpecimenModalProps {
@@ -23,6 +23,10 @@ const getInitialFormData = (): SpecimenFormData => ({
   batchId: '',
   photographed: false,
   notes: '',
+  complianceStatus: DEFAULT_COMPLIANCE_STATUS,
+  permitNumber: '',
+  permitExpiryDate: '',
+  complianceNotes: '',
 });
 
 export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batches }: SpecimenModalProps) {
@@ -33,6 +37,8 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
   useEffect(() => {
     if (isOpen) {
       if (specimen) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sAny = specimen as any;
         setFormData({
           specimenNo: specimen.specimenNo,
           species: specimen.species,
@@ -43,6 +49,10 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
           batchId: specimen.batchId,
           photographed: specimen.photographed,
           notes: specimen.notes,
+          complianceStatus: sAny.complianceStatus ?? DEFAULT_COMPLIANCE_STATUS,
+          permitNumber: sAny.permitNumber ?? '',
+          permitExpiryDate: sAny.permitExpiryDate ?? '',
+          complianceNotes: sAny.complianceNotes ?? '',
         });
       } else {
         setFormData(getInitialFormData());
@@ -75,6 +85,10 @@ export function SpecimenModal({ isOpen, onClose, onSubmit, specimen, boxes, batc
       batchId: (formData.get('batchId') as string) || '',
       photographed: formData.get('photographed') === 'on',
       notes: (formData.get('notes') as string) || '',
+      complianceStatus: (formData.get('complianceStatus') as ComplianceStatus) ?? DEFAULT_COMPLIANCE_STATUS,
+      permitNumber: (formData.get('permitNumber') as string) ?? '',
+      permitExpiryDate: (formData.get('permitExpiryDate') as string) ?? '',
+      complianceNotes: (formData.get('complianceNotes') as string) ?? '',
     };
 
     const newErrors: Partial<Record<keyof SpecimenFormData, string>> = {};

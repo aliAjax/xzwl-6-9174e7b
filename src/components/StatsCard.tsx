@@ -7,6 +7,10 @@ interface StatsCardProps {
     unphotographed: number;
     totalBoxes: number;
     totalBatches: number;
+    highRiskCount: number;
+    protectedCount: number;
+    invasiveCount: number;
+    permitExpiredCount: number;
   };
 }
 
@@ -47,10 +51,38 @@ export function StatsCard({ stats }: StatsCardProps) {
       color: 'text-moss-600',
       bgColor: 'bg-moss-100',
     },
+    {
+      label: '高风险标本',
+      value: stats.highRiskCount,
+      icon: AlertTriangle,
+      color: 'text-amber-700',
+      bgColor: 'bg-amber-100',
+    },
+    {
+      label: '保护物种',
+      value: stats.protectedCount,
+      icon: Shield,
+      color: 'text-amber-700',
+      bgColor: 'bg-amber-100',
+    },
+    {
+      label: '外来物种',
+      value: stats.invasiveCount,
+      icon: AlertCircle,
+      color: 'text-red-700',
+      bgColor: 'bg-red-100',
+    },
+    {
+      label: '许可过期',
+      value: stats.permitExpiredCount,
+      icon: Clock,
+      color: 'text-rust-700',
+      bgColor: 'bg-rust-100',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+    <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-4">
       {statItems.map((item, index) => (
         <div
           key={item.label}

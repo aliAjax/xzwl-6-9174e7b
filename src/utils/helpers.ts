@@ -16,7 +16,7 @@ import type {
   ComplianceStatus,
 } from '../types';
 import type { Box, Specimen, CollectionBatch } from '../types';
-import { LABEL_FIELDS, COMPLIANCE_STATUS_OPTIONS } from '../types';
+import { LABEL_FIELDS, COMPLIANCE_STATUS_OPTIONS, DEFAULT_COMPLIANCE_STATUS, BACKUP_FILE_VERSION } from '../types';
 
 export const generateId = (): string => {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -36,6 +36,45 @@ export const getTodayString = (): string => {
   return new Date().toISOString().split('T')[0];
 };
 
+const getComplianceStatusLabel = (status: ComplianceStatus): string => {
+  const option = COMPLIANCE_STATUS_OPTIONS.find(opt => opt.value === status);
+  return option?.label || status;
+};
+
+const COMPLIANCE_STATUS_LABEL_TO_VALUE: Record<string, ComplianceStatus> = {
+  '无需合规': 'not_relevant',
+  '保护物种': 'protected_species',
+  '外来物种': 'invasive_species',
+  '特许采集': 'special_permit',
+  '许可过期': 'expired_permit',
+  '待确认': 'unknown',
+};
+
+const VALID_COMPLIANCE_VALUES = new Set([
+  ...COMPLIANCE_STATUS_OPTIONS.map(opt => opt.value),
+  ...COMPLIANCE_STATUS_OPTIONS.map(opt => opt.label),
+]);
+
+const parseComplianceStatus = (value: string): ComplianceStatus | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  
+  if (!VALID_COMPLIANCE_VALUES.has(trimmed) && !VALID_COMPLIANCE_VALUES.has(trimmed.toLowerCase())) {
+    return null;
+  }
+  
+  if (COMPLIANCE_STATUS_LABEL_TO_VALUE[trimmed]) {
+    return COMPLIANCE_STATUS_LABEL_TO_VALUE[trimmed];
+  }
+  
+  const lowerValue = trimmed.toLowerCase();
+  const option = COMPLIANCE_STATUS_OPTIONS.find(opt => 
+    opt.value === lowerValue || opt.label === trimmed
+  );
+  
+  return option?.value || null;
+};
+
 export const escapeCsvField = (field: string | number | boolean): string => {
   const str = String(field);
   if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
@@ -53,6 +92,10 @@ export interface ExportSpecimenData {
   photographed: boolean;
   boxName: string;
   notes: string;
+  complianceStatus: ComplianceStatus;
+  permitNumber: string;
+  permitExpiryDate: string;
+  complianceNotes: string;
 }
 
 export const generateSpecimenCsv = (specimens: ExportSpecimenData[]): string => {
@@ -65,6 +108,10 @@ export const generateSpecimenCsv = (specimens: ExportSpecimenData[]): string => 
     '拍照状态',
     '展盒名称',
     '备注',
+    '合规状态',
+    '许可证编号',
+    '到期日期',
+    '合规备注',
   ];
 
   const rows = specimens.map((s) => [
@@ -76,6 +123,10 @@ export const generateSpecimenCsv = (specimens: ExportSpecimenData[]): string => 
     s.photographed ? '已拍照' : '未拍照',
     s.boxName,
     s.notes,
+    getComplianceStatusLabel(s.complianceStatus),
+    s.permitNumber,
+    s.permitExpiryDate,
+    s.complianceNotes,
   ]);
 
   const csvContent = [headers, ...rows]
@@ -140,6 +191,22 @@ const FIELD_NAME_PATTERNS: Record<keyof CsvRowData | 'boxName', FieldPattern> = 
     exact: ['批次', '批次号', 'batchid', 'batch_id', '采集批次', 'batch'],
     contains: ['批次', 'batchid', '采集批次', 'batch_id'],
   },
+  complianceStatus: {
+    exact: ['合规状态', 'compliancestatus', 'compliance_status', 'compliance'],
+    contains: ['合规状态', 'compliancestatus', 'compliance_status', 'compliance'],
+  },
+  permitNumber: {
+    exact: ['许可证编号', '许可证号', '许可编号', 'permitnumber', 'permit_number', 'permitno', 'permit_no'],
+    contains: ['许可证编号', '许可证号', '许可编号', 'permitnumber', 'permit_number', 'permitno'],
+  },
+  permitExpiryDate: {
+    exact: ['到期日期', '有效期至', '许可到期', 'permitexpirydate', 'permit_expiry_date', 'expirydate'],
+    contains: ['到期日期', '有效期至', '许可到期', 'permitexpirydate', 'permit_expiry_date', 'expirydate'],
+  },
+  complianceNotes: {
+    exact: ['合规备注', '合规说明', 'compliancenotes', 'compliance_notes', 'compliance_remark'],
+    contains: ['合规备注', '合规说明', 'compliancenotes', 'compliance_notes'],
+  },
 };
 
 const MATCH_PRIORITY: (keyof CsvRowData | 'boxName')[] = [
@@ -151,6 +218,10 @@ const MATCH_PRIORITY: (keyof CsvRowData | 'boxName')[] = [
   'boxName',
   'batchId',
   'species',
+  'complianceStatus',
+  'permitNumber',
+  'permitExpiryDate',
+  'complianceNotes',
   'notes',
 ];
 
@@ -385,6 +456,43 @@ export const validateAndPreviewCsv = (
         case 'batchId':
           data.batchId = value.trim();
           break;
+        case 'complianceStatus': {
+          const statusValue = value.trim();
+          if (statusValue) {
+            const parsedStatus = parseComplianceStatus(statusValue);
+            if (parsedStatus === null) {
+              errors.push(createError(
+                actualRowIndex,
+                '合规状态',
+                'invalid_compliance_status',
+                `合规状态格式不正确: "${statusValue}"，有效值包括：无需合规、保护物种、外来物种、特许采集、许可过期、待确认`
+              ));
+            } else {
+              data.complianceStatus = parsedStatus;
+            }
+          }
+          break;
+        }
+        case 'permitNumber':
+          data.permitNumber = value.trim();
+          break;
+        case 'permitExpiryDate':
+          if (value.trim()) {
+            if (!isValidDate(value)) {
+              errors.push(createError(
+                actualRowIndex,
+                '到期日期',
+                'invalid_date',
+                `日期格式不正确: "${value}"`
+              ));
+            } else {
+              data.permitExpiryDate = normalizeDate(value);
+            }
+          }
+          break;
+        case 'complianceNotes':
+          data.complianceNotes = value.trim();
+          break;
       }
     });
 
@@ -467,6 +575,10 @@ export const convertToSpecimenFormData = (
     boxId: box?.id || '',
     batchId: data.batchId || '',
     notes: data.notes || '',
+    complianceStatus: (data.complianceStatus as ComplianceStatus) ?? DEFAULT_COMPLIANCE_STATUS,
+    permitNumber: data.permitNumber || '',
+    permitExpiryDate: data.permitExpiryDate || '',
+    complianceNotes: data.complianceNotes || '',
   };
 };
 
@@ -485,7 +597,7 @@ export const createBackupData = (
   batches: CollectionBatch[]
 ): BackupFileData => {
   return {
-    version: 1,
+    version: BACKUP_FILE_VERSION,
     exportedAt: new Date().toISOString(),
     appName: '昆虫标本管理系统',
     data: {
@@ -558,10 +670,31 @@ export const parseBackupFile = (content: string): BackupFileData => {
   }
 };
 
+export const migrateSpecimenWithCompliance = (specimen: Partial<Specimen>): Specimen => {
+  return {
+    id: specimen.id || generateId(),
+    specimenNo: specimen.specimenNo || '',
+    species: specimen.species || '',
+    collectionLocation: specimen.collectionLocation || '',
+    collectionDate: specimen.collectionDate || '',
+    pinnedStatus: specimen.pinnedStatus ?? false,
+    boxId: specimen.boxId || '',
+    batchId: specimen.batchId || '',
+    photographed: specimen.photographed ?? false,
+    notes: specimen.notes || '',
+    complianceStatus: specimen.complianceStatus ?? DEFAULT_COMPLIANCE_STATUS,
+    permitNumber: specimen.permitNumber || '',
+    permitExpiryDate: specimen.permitExpiryDate || '',
+    complianceNotes: specimen.complianceNotes || '',
+    createdAt: specimen.createdAt || new Date().toISOString(),
+    updatedAt: specimen.updatedAt || new Date().toISOString(),
+  };
+};
+
 export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibilityCheck => {
   const errors: string[] = [];
   const warnings: string[] = [];
-  const currentVersion = 1;
+  const currentVersion = BACKUP_FILE_VERSION;
   const versionMatch = backupData.version === currentVersion;
 
   if (backupData.version > currentVersion) {
@@ -570,6 +703,9 @@ export const checkCompatibility = (backupData: BackupFileData): RestoreCompatibi
 
   if (backupData.version < currentVersion) {
     warnings.push(`备份文件版本 (v${backupData.version}) 低于当前系统版本 (v${currentVersion})，可能存在兼容性问题`);
+    if (backupData.version < 2) {
+      warnings.push('备份文件版本 v1 不包含合规字段数据，恢复后合规字段将使用默认值（无需合规）');
+    }
   }
 
   if (!Array.isArray(backupData.data.boxes)) {
@@ -801,7 +937,7 @@ export const remapIds = (
         const newBatchId = specimen.batchId ? (batchIdMap[specimen.batchId] || specimen.batchId) : '';
 
         return {
-          ...specimen,
+          ...migrateSpecimenWithCompliance(specimen),
           id: newSpecimenId,
           boxId: newBoxId,
           batchId: newBatchId,
@@ -832,12 +968,14 @@ export const handleSpecimenNoDuplicates = (
 
   const remappedSpecimens = Array.isArray(backupData.data.specimens)
     ? backupData.data.specimens.map(specimen => {
-        if (!specimen.specimenNo) {
-          return specimen;
+        const migratedSpecimen = migrateSpecimenWithCompliance(specimen);
+        
+        if (!migratedSpecimen.specimenNo) {
+          return migratedSpecimen;
         }
 
-        if (currentNos.has(specimen.specimenNo.toLowerCase())) {
-          const baseNo = specimen.specimenNo;
+        if (currentNos.has(migratedSpecimen.specimenNo.toLowerCase())) {
+          const baseNo = migratedSpecimen.specimenNo;
           let suffix = 1;
           let newNo = `${baseNo}_备份${suffix}`;
 
@@ -850,11 +988,11 @@ export const handleSpecimenNoDuplicates = (
           remappedNos.push(`${baseNo} → ${newNo}`);
 
           return {
-            ...specimen,
+            ...migratedSpecimen,
             specimenNo: newNo,
           };
         }
-        return specimen;
+        return migratedSpecimen;
       })
     : [];
 
@@ -892,9 +1030,9 @@ export const filterSpecimensWithValidReferences = (
     const batchValid = !specimen.batchId || safeValidBatchIds.has(specimen.batchId);
 
     if (boxValid && batchValid) {
-      valid.push(specimen);
+      valid.push(migrateSpecimenWithCompliance(specimen));
     } else {
-      invalid.push(specimen);
+      invalid.push(migrateSpecimenWithCompliance(specimen));
     }
   });
 
@@ -934,6 +1072,16 @@ export const performRestore = (
 
     const noRemapResult = handleSpecimenNoDuplicates(processedData, currentSpecimens);
     processedData = noRemapResult.data;
+  }
+
+  if (options.importSpecimens && options.mode === 'overwrite') {
+    processedData = {
+      ...processedData,
+      data: {
+        ...processedData.data,
+        specimens: processedData.data.specimens.map(s => migrateSpecimenWithCompliance(s)),
+      },
+    };
   }
 
   const resultStats: RestoreResult['stats'] = {

@@ -44,20 +44,24 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
       }
     }
 
-    return filtered.map((s) => ({
-      specimenNo: s.specimenNo,
-      species: s.species,
-      collectionLocation: s.collectionLocation,
-      collectionDate: formatDate(s.collectionDate),
-      pinnedStatus: s.pinnedStatus,
-      photographed: s.photographed,
-      boxName: getBoxName(s.boxId),
-      notes: s.notes,
-      complianceStatus: s.complianceStatus,
-      permitNumber: s.permitNumber,
-      permitExpiryDate: formatDate(s.permitExpiryDate),
-      complianceNotes: s.complianceNotes,
-    }));
+    return filtered.map((s) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sAny = s as any;
+      return {
+        specimenNo: s.specimenNo,
+        species: s.species,
+        collectionLocation: s.collectionLocation,
+        collectionDate: formatDate(s.collectionDate),
+        pinnedStatus: s.pinnedStatus,
+        photographed: s.photographed,
+        boxName: getBoxName(s.boxId),
+        notes: s.notes,
+        complianceStatus: sAny.complianceStatus ?? 'not_relevant',
+        permitNumber: sAny.permitNumber ?? '',
+        permitExpiryDate: formatDate(sAny.permitExpiryDate ?? ''),
+        complianceNotes: sAny.complianceNotes ?? '',
+      };
+    });
   }, [specimens, boxes, exportType, selectedBoxId]);
 
   const previewCount = exportData.length;
@@ -205,7 +209,7 @@ export function ExportModal({ isOpen, onClose, specimens, boxes }: ExportModalPr
             <div className="p-4 bg-parchment-100 border border-oak-200 rounded-xl">
               <h4 className="font-medium text-oak-800 mb-2">导出字段</h4>
               <p className="text-sm text-oak-600">
-                标本编号、物种名、采集地点、采集日期、针插状态、拍照状态、展盒名称、备注
+                标本编号、物种名、采集地点、采集日期、针插状态、拍照状态、展盒名称、备注、合规状态、许可证编号、到期日期、合规备注
               </p>
             </div>
 
