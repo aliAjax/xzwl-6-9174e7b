@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import { X, Hash, AlertTriangle, CheckCircle, Copy, Save, Trash2, FolderOpen, Plus, ChevronDown } from 'lucide-react';
+import { X, Hash, AlertTriangle, CheckCircle, Copy, Save, Trash2, FolderOpen, ChevronDown } from 'lucide-react';
 import type { SpecimenFormData, Box, NumberTemplatePreset } from '../types';
 import { DEFAULT_COMPLIANCE_STATUS } from '../types';
 import { getTodayString, generateId } from '../utils/helpers';
@@ -59,12 +59,6 @@ export function SpecimenNoGenerator({
   const [newPresetName, setNewPresetName] = useState('');
   const [presetToDelete, setPresetToDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadPresets();
-    }
-  }, [isOpen]);
-
   const loadPresets = useCallback(() => {
     try {
       const stored = window.localStorage.getItem(PRESETS_STORAGE_KEY);
@@ -75,6 +69,12 @@ export function SpecimenNoGenerator({
       console.error('Error loading presets:', error);
     }
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadPresets();
+    }
+  }, [isOpen, loadPresets]);
 
   const savePresetsToStorage = useCallback((newPresets: NumberTemplatePreset[]) => {
     try {
