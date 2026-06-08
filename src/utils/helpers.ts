@@ -621,6 +621,272 @@ export const validateAndPreviewCsv = (
     invalidCount,
     totalCount: rows.length,
     relatedObjects,
+    rawRows: dataRows,
+  };
+};
+
+export const revalidatePreviewData = (
+  headers: string[],
+  fieldMapping: CsvFieldMapping,
+  rawRows: string[][],
+  existingSpecimens: Specimen[],
+  existingBoxes: Box[],
+  existingBatches: CollectionBatch[]
+): ImportPreviewData => {
+  const existingSpecimenNos = new Set(existingSpecimens.map(s => s.specimenNo.toLowerCase()));
+  const existingBoxNames = new Set(existingBoxes.map(b => b.name.toLowerCase()));
+  const existingBatchNames = new Set(existingBatches.map(b => b.name.toLowerCase()));
+  const existingBatchIds = new Set(existingBatches.map(b => b.id));
+  const fileSpecimenNos = new Map<string, number[]>();
+
+  const rows: ImportPreviewRow[] = rawRows.map((rowData, rowIdx) => {
+    const actualRowIndex = rowIdx + 2;
+    const data: Partial<CsvRowData> = {};
+    const errors: ValidationError[] = [];
+    const warnings: ValidationError[] = [];
+
+    headers.forEach((header, colIdx) => {
+      const field = fieldMapping[header];
+      const value = rowData[colIdx] || '';
+
+      if (field === null) return;
+
+      switch (field) {
+        case 'specimenNo':
+          data.specimenNo = value.trim();
+          if (data.specimenNo) {
+            const lowerNo = data.specimenNo.toLowerCase();
+            if (existingSpecimenNos.has(lowerNo)) {
+              errors.push(createError(
+                actualRowIndex,
+                '标本编号',
+                'duplicate_no',
+                `标本编号 "${data.specimenNo}" 已存在于系统中`
+              ));
+            }
+            if (!fileSpecimenNos.has(lowerNo)) {
+              fileSpecimenNos.set(lowerNo, []);
+            }
+            fileSpecimenNos.get(lowerNo)!.push(actualRowIndex);
+          }
+          break;
+        case 'species':
+          data.species = value.trim();
+          break;
+        case 'collectionLocation':
+          data.collectionLocation = value.trim();
+          break;
+        case 'collectionDate':
+          if (value.trim()) {
+            if (!isValidDate(value)) {
+              errors.push(createError(
+                actualRowIndex,
+                '采集日期',
+                'invalid_date',
+                `日期格式不正确: "${value}"`
+              ));
+            } else {
+              data.collectionDate = normalizeDate(value);
+            }
+          }
+          break;
+        case 'pinnedStatus': {
+          const pinnedBool = parseBooleanValue(value);
+          if (pinnedBool === null && value.trim() !== '') {
+            errors.push(createError(
+              actualRowIndex,
+              '针插状态',
+              'invalid_boolean',
+              `针插状态格式不正确: "${value}"，请使用"已针插"/"未针插"或"是"/"否"`
+            ));
+          } else {
+            data.pinnedStatus = pinnedBool ?? false;
+          }
+          break;
+        }
+        case 'photographed': {
+          const photoBool = parseBooleanValue(value);
+          if (photoBool === null && value.trim() !== '') {
+            errors.push(createError(
+              actualRowIndex,
+              '拍照状态',
+              'invalid_boolean',
+              `拍照状态格式不正确: "${value}"，请使用"已拍照"/"未拍照"或"是"/"否"`
+            ));
+          } else {
+            data.photographed = photoBool ?? false;
+          }
+          break;
+        }
+        case 'boxName':
+          data.boxName = value.trim();
+          break;
+        case 'notes':
+          data.notes = value.trim();
+          break;
+        case 'batchId': {
+          const batchValue = value.trim();
+          data.batchId = batchValue;
+          break;
+        }
+        case 'complianceStatus': {
+          const statusValue = value.trim();
+          if (statusValue) {
+            const parsedStatus = parseComplianceStatus(statusValue);
+            if (parsedStatus === null) {
+              errors.push(createError(
+                actualRowIndex,
+                '合规状态',
+                'invalid_compliance_status',
+                `合规状态格式不正确: "${statusValue}"，有效值包括：无需合规、保护物种、外来物种、特许采集、许可过期、待确认`
+              ));
+            } else {
+              data.complianceStatus = parsedStatus;
+            }
+          }
+          break;
+        }
+        case 'permitNumber':
+          data.permitNumber = value.trim();
+          break;
+        case 'permitExpiryDate':
+          if (value.trim()) {
+            if (!isValidDate(value)) {
+              errors.push(createError(
+                actualRowIndex,
+                '到期日期',
+                'invalid_date',
+                `日期格式不正确: "${value}"`
+              ));
+            } else {
+              data.permitExpiryDate = normalizeDate(value);
+            }
+          }
+          break;
+        case 'complianceNotes':
+          data.complianceNotes = value.trim();
+          break;
+      }
+    });
+
+    if (!data.specimenNo) {
+      errors.push(createError(
+        actualRowIndex,
+        '标本编号',
+        'missing_required',
+        '缺少必填项：标本编号'
+      ));
+    }
+    if (!data.species) {
+      errors.push(createError(
+        actualRowIndex,
+        '物种名',
+        'missing_required',
+        '缺少必填项：物种名'
+      ));
+    }
+
+    return {
+      rowIndex: actualRowIndex,
+      data,
+      errors,
+      warnings,
+      isValid: errors.length === 0,
+    };
+  });
+
+  rows.forEach((row) => {
+    if (row.data.specimenNo) {
+      const lowerNo = row.data.specimenNo.toLowerCase();
+      const occurrences = fileSpecimenNos.get(lowerNo) || [];
+      if (occurrences.length > 1) {
+        const otherRows = occurrences.filter(r => r !== row.rowIndex);
+        row.errors.push(createError(
+          row.rowIndex,
+          '标本编号',
+          'duplicate_no_in_file',
+          `标本编号在文件内重复，第 ${otherRows.join('、')} 行也使用了该编号`
+        ));
+        row.isValid = false;
+      }
+    }
+  });
+
+  const newBoxMap = new Map<string, number[]>();
+  const newBatchMap = new Map<string, number[]>();
+
+  rows.forEach((row) => {
+    if (!row.isValid) return;
+
+    if (row.data.boxName) {
+      const lowerBoxName = row.data.boxName.toLowerCase();
+      if (!existingBoxNames.has(lowerBoxName)) {
+        row.warnings.push(createError(
+          row.rowIndex,
+          '展盒名称',
+          'box_not_found',
+          `展盒 "${row.data.boxName}" 将在导入时自动创建`
+        ));
+        if (!newBoxMap.has(lowerBoxName)) {
+          newBoxMap.set(lowerBoxName, []);
+        }
+        newBoxMap.get(lowerBoxName)!.push(row.rowIndex);
+      }
+    }
+
+    if (row.data.batchId) {
+      const batchValue = row.data.batchId;
+      const isExistingId = existingBatchIds.has(batchValue);
+      const lowerBatchName = batchValue.toLowerCase();
+      const isExistingName = existingBatchNames.has(lowerBatchName);
+
+      if (!isExistingId && !isExistingName) {
+        row.warnings.push(createError(
+          row.rowIndex,
+          '采集批次',
+          'batch_not_found',
+          `采集批次 "${batchValue}" 将在导入时自动创建`
+        ));
+        if (!newBatchMap.has(lowerBatchName)) {
+          newBatchMap.set(lowerBatchName, []);
+        }
+        newBatchMap.get(lowerBatchName)!.push(row.rowIndex);
+      }
+    }
+  });
+
+  const newBoxes: NewBoxInfo[] = Array.from(newBoxMap.entries()).map(([lowerName, rowIndices]) => {
+    const firstRowWithBox = rows.find(r => r.data.boxName?.toLowerCase() === lowerName);
+    const displayName = firstRowWithBox?.data.boxName || lowerName;
+    return { name: displayName, rowIndices };
+  });
+
+  const newBatches: NewBatchInfo[] = Array.from(newBatchMap.entries()).map(([lowerName, rowIndices]) => {
+    const firstRowWithBatch = rows.find(r => r.data.batchId?.toLowerCase() === lowerName);
+    const displayName = firstRowWithBatch?.data.batchId || lowerName;
+    return { name: displayName, rowIndices };
+  });
+
+  const relatedObjects: ImportRelatedObjects = {
+    newBoxes,
+    newBatches,
+    existingBoxNames,
+    existingBatchNames,
+    existingBatchIds,
+  };
+
+  const validCount = rows.filter(r => r.isValid).length;
+  const invalidCount = rows.filter(r => !r.isValid).length;
+
+  return {
+    headers,
+    fieldMapping,
+    rows,
+    validCount,
+    invalidCount,
+    totalCount: rows.length,
+    relatedObjects,
+    rawRows,
   };
 };
 

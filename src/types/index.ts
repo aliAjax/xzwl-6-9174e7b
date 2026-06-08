@@ -154,6 +154,7 @@ export interface ImportPreviewData {
   invalidCount: number;
   totalCount: number;
   relatedObjects: ImportRelatedObjects;
+  rawRows: string[][];
 }
 
 export const BACKUP_FILE_VERSION = 2;

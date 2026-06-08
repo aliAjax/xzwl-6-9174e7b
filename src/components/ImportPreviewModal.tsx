@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
-import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine, Package, Layers, Plus, Info } from 'lucide-react';
-import type { Box, Specimen, CollectionBatch, ImportPreviewData, SpecimenFormData, BoxFormData, CollectionBatchFormData } from '../types';
-import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData, createBoxFormData, createBatchFormData } from '../utils/helpers';
+import { X, Upload, Check, AlertTriangle, FileSpreadsheet, CheckCircle, XCircle, ArrowUpFromLine, Package, Layers, Plus, Info, Edit3, Save, RotateCcw, ChevronDown } from 'lucide-react';
+import type { Box, Specimen, CollectionBatch, ImportPreviewData, SpecimenFormData, BoxFormData, CollectionBatchFormData, CsvFieldMapping, CsvRowData } from '../types';
+import { validateAndPreviewCsv, readFileAsText, convertToSpecimenFormData, createBoxFormData, createBatchFormData, revalidatePreviewData } from '../utils/helpers';
 
 interface ImportPreviewModalProps {
   isOpen: boolean;
@@ -16,16 +16,34 @@ interface ImportPreviewModalProps {
 
 type Step = 'upload' | 'preview' | 'confirm-objects';
 
-const DISPLAY_COLUMNS = [
+const ALL_TARGET_FIELDS: { key: keyof CsvRowData | 'boxName' | null; label: string; required?: boolean }[] = [
+  { key: null, label: '— 忽略此列 —' },
   { key: 'specimenNo', label: '标本编号', required: true },
   { key: 'species', label: '物种名', required: true },
-  { key: 'collectionLocation', label: '采集地点', required: false },
-  { key: 'collectionDate', label: '采集日期', required: false },
-  { key: 'pinnedStatus', label: '针插状态', required: false },
-  { key: 'photographed', label: '拍照状态', required: false },
-  { key: 'boxName', label: '展盒名称', required: false },
-  { key: 'notes', label: '备注', required: false },
+  { key: 'collectionLocation', label: '采集地点' },
+  { key: 'collectionDate', label: '采集日期' },
+  { key: 'pinnedStatus', label: '针插状态' },
+  { key: 'photographed', label: '拍照状态' },
+  { key: 'boxName', label: '展盒名称' },
+  { key: 'batchId', label: '采集批次' },
+  { key: 'complianceStatus', label: '合规状态' },
+  { key: 'permitNumber', label: '许可证编号' },
+  { key: 'permitExpiryDate', label: '到期日期' },
+  { key: 'complianceNotes', label: '合规备注' },
+  { key: 'notes', label: '备注' },
 ];
+
+const DISPLAY_COLUMNS = ALL_TARGET_FIELDS.filter(f => f.key !== null).map(f => ({
+  key: f.key as string,
+  label: f.label,
+  required: f.required || false,
+}));
+
+interface EditingCell {
+  rowIndex: number;
+  fieldKey: string;
+  value: string;
+}
 
 export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches, onImport, onCreateBox, onCreateBatch }: ImportPreviewModalProps) {
   const [step, setStep] = useState<Step>('upload');
@@ -37,6 +55,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
   const [isImporting, setIsImporting] = useState(false);
   const [selectedBoxesToCreate, setSelectedBoxesToCreate] = useState<Set<string>>(new Set());
   const [selectedBatchesToCreate, setSelectedBatchesToCreate] = useState<Set<string>>(new Set());
+  const [editingCell, setEditingCell] = useState<EditingCell | null>(null);
+  const [showFieldMapping, setShowFieldMapping] = useState(true);
 
   const resetState = useCallback(() => {
     setStep('upload');
@@ -47,6 +67,8 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     setIsImporting(false);
     setSelectedBoxesToCreate(new Set());
     setSelectedBatchesToCreate(new Set());
+    setEditingCell(null);
+    setShowFieldMapping(true);
   }, []);
 
   const handleClose = () => {
@@ -82,6 +104,91 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
       setError(e instanceof Error ? e.message : '文件解析失败，请检查CSV格式');
     }
   }, [specimens, boxes, batches]);
+
+  const triggerRevalidation = useCallback((fieldMapping: CsvFieldMapping, rawRows: string[][]) => {
+    const newPreview = revalidatePreviewData(
+      previewData!.headers,
+      fieldMapping,
+      rawRows,
+      specimens,
+      boxes,
+      batches
+    );
+    setPreviewData(newPreview);
+    return newPreview;
+  }, [previewData, specimens, boxes, batches]);
+
+  const handleFieldMappingChange = (header: string, newTargetField: keyof CsvRowData | 'boxName' | null) => {
+    if (!previewData) return;
+    
+    const newMapping = { ...previewData.fieldMapping };
+    newMapping[header] = newTargetField;
+    
+    const newPreview = triggerRevalidation(newMapping, previewData.rawRows);
+    
+    const newBoxes = newPreview.relatedObjects.newBoxes;
+    const newBatches = newPreview.relatedObjects.newBatches;
+    
+    if (newBoxes.length > 0) {
+      setSelectedBoxesToCreate(prev => {
+        const next = new Set(prev);
+        newBoxes.forEach(b => next.add(b.name.toLowerCase()));
+        return next;
+      });
+    }
+    if (newBatches.length > 0) {
+      setSelectedBatchesToCreate(prev => {
+        const next = new Set(prev);
+        newBatches.forEach(b => next.add(b.name.toLowerCase()));
+        return next;
+      });
+    }
+  };
+
+  const handleCellEditStart = (rowIndex: number, fieldKey: string, currentValue: string) => {
+    setEditingCell({
+      rowIndex,
+      fieldKey,
+      value: currentValue,
+    });
+  };
+
+  const handleCellEditSave = () => {
+    if (!editingCell || !previewData) return;
+    
+    const { rowIndex, fieldKey, value } = editingCell;
+    const dataRowIdx = rowIndex - 2;
+    
+    if (dataRowIdx < 0 || dataRowIdx >= previewData.rawRows.length) {
+      setEditingCell(null);
+      return;
+    }
+    
+    const headerIdx = previewData.headers.findIndex(h => 
+      previewData.fieldMapping[h] === fieldKey
+    );
+    
+    if (headerIdx === -1) {
+      setEditingCell(null);
+      return;
+    }
+    
+    const newRawRows = previewData.rawRows.map((row, idx) => {
+      if (idx === dataRowIdx) {
+        const newRow = [...row];
+        newRow[headerIdx] = value;
+        return newRow;
+      }
+      return row;
+    });
+    
+    triggerRevalidation(previewData.fieldMapping, newRawRows);
+    setEditingCell(null);
+  };
+
+  const handleCellEditCancel = () => {
+    setEditingCell(null);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -243,6 +350,19 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
     return value?.toString() || '';
   };
 
+  const getFieldRawValue = (row: ImportPreviewData['rows'][0], key: string): string => {
+    if (!previewData) return '';
+    const dataRowIdx = row.rowIndex - 2;
+    if (dataRowIdx < 0 || dataRowIdx >= previewData.rawRows.length) return '';
+    
+    const headerIdx = previewData.headers.findIndex(h => 
+      previewData.fieldMapping[h] === key
+    );
+    if (headerIdx === -1) return '';
+    
+    return previewData.rawRows[dataRowIdx][headerIdx] || '';
+  };
+
   const hasErrorInField = (row: ImportPreviewData['rows'][0], key: string): boolean => {
     const columnLabel = DISPLAY_COLUMNS.find(c => c.key === key)?.label;
     return row.errors.some(e => e.field === columnLabel);
@@ -292,6 +412,120 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
   const displayedRows = previewData 
     ? (showOnlyInvalid ? previewData.rows.filter(r => !r.isValid) : previewData.rows)
     : [];
+
+  const getMappedFieldLabel = (header: string): string => {
+    if (!previewData) return '未识别';
+    const mappedField = previewData.fieldMapping[header];
+    if (mappedField === null) return '— 忽略 —';
+    const fieldInfo = ALL_TARGET_FIELDS.find(f => f.key === mappedField);
+    return fieldInfo?.label || mappedField;
+  };
+
+  const renderFieldMappingDropdown = (header: string) => {
+    if (!previewData) return null;
+    const currentMapping = previewData.fieldMapping[header];
+    
+    return (
+      <div className="relative">
+        <select
+          value={currentMapping === null ? '' : currentMapping}
+          onChange={(e) => {
+            const value = e.target.value;
+            handleFieldMappingChange(header, value === '' ? null : value as keyof CsvRowData | 'boxName');
+          }}
+          className="w-full px-2 py-1.5 text-xs border border-oak-300 rounded-md bg-parchment-50 text-oak-800 focus:outline-none focus:ring-2 focus:ring-rust-500 focus:border-transparent appearance-none pr-8"
+        >
+          {ALL_TARGET_FIELDS.map(field => (
+            <option key={field.key === null ? 'null' : field.key} value={field.key === null ? '' : field.key}>
+              {field.label}
+              {field.required && ' *'}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className="w-3 h-3 absolute right-2 top-1/2 -translate-y-1/2 text-oak-500 pointer-events-none" />
+      </div>
+    );
+  };
+
+  const renderEditableCell = (row: ImportPreviewData['rows'][0], colKey: string) => {
+    const isEditing = editingCell?.rowIndex === row.rowIndex && editingCell?.fieldKey === colKey;
+    const hasError = hasErrorInField(row, colKey);
+    const fieldErrors = getFieldErrors(row, colKey);
+    const rawValue = getFieldRawValue(row, colKey);
+    const displayValue = getFieldDisplayValue(row, colKey);
+    const isBooleanField = colKey === 'pinnedStatus' || colKey === 'photographed';
+
+    if (isEditing) {
+      return (
+        <div className="flex items-center gap-1">
+          <input
+            type="text"
+            value={editingCell.value}
+            onChange={(e) => setEditingCell({ ...editingCell, value: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleCellEditSave();
+              } else if (e.key === 'Escape') {
+                handleCellEditCancel();
+              }
+            }}
+            autoFocus
+            className="flex-1 px-2 py-1 text-sm border-2 border-rust-400 rounded bg-parchment-50 text-oak-800 focus:outline-none min-w-[80px]"
+          />
+          <button
+            type="button"
+            onClick={handleCellEditSave}
+            className="p-1 text-green-600 hover:bg-green-100 rounded transition-colors"
+            title="保存"
+          >
+            <Save className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleCellEditCancel}
+            className="p-1 text-rust-600 hover:bg-rust-100 rounded transition-colors"
+            title="取消"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1 group">
+        {hasError && (
+          <div className="group relative">
+            <AlertTriangle className="w-4 h-4 text-rust-600 flex-shrink-0" />
+            <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-20">
+              <div className="bg-rust-900 text-white text-xs rounded-md px-2 py-1 whitespace-nowrap shadow-lg max-w-xs">
+                {fieldErrors.map((err, idx) => (
+                  <div key={idx} className="flex items-center gap-1">
+                    {getErrorIcon(row.errors.find(e => e.message === err)?.type || '')}
+                    {err}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        <span className={`${hasError ? 'text-rust-700 font-medium' : 'text-oak-800'} flex-1`}>
+          {displayValue || (
+            <span className="text-oak-300">—</span>
+          )}
+        </span>
+        <button
+          type="button"
+          onClick={() => handleCellEditStart(row.rowIndex, colKey, isBooleanField ? rawValue : displayValue)}
+          className="p-1 text-oak-400 hover:text-oak-600 hover:bg-oak-100 rounded opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+          title="编辑单元格"
+        >
+          <Edit3 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  };
 
   if (!isOpen) return null;
 
@@ -364,7 +598,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
               <div className="mt-8 p-6 bg-parchment-100 border border-oak-200 rounded-xl">
                 <h3 className="font-semibold text-oak-800 font-serif mb-3">CSV文件格式说明</h3>
                 <p className="text-sm text-oak-600 mb-4">
-                  CSV文件应包含以下列，系统将自动识别列名：
+                  CSV文件应包含以下列，系统将自动识别列名，您也可以在预览时手动调整字段映射：
                 </p>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className="flex items-start gap-2">
@@ -583,40 +817,70 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                         </span>
                       </div>
                     </div>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={showOnlyInvalid}
-                        onChange={(e) => setShowOnlyInvalid(e.target.checked)}
-                        className="w-4 h-4 text-rust-600 rounded border-oak-300"
-                      />
-                      <span className="text-sm text-oak-600">只显示有问题的行</span>
-                    </label>
+                    <div className="flex items-center gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showOnlyInvalid}
+                          onChange={(e) => setShowOnlyInvalid(e.target.checked)}
+                          className="w-4 h-4 text-rust-600 rounded border-oak-300"
+                        />
+                        <span className="text-sm text-oak-600">只显示有问题的行</span>
+                      </label>
+                    </div>
                   </div>
 
-                  <div className="mt-4 flex items-center gap-3 text-sm">
-                    <span className="text-oak-500">字段识别：</span>
-                    <div className="flex flex-wrap gap-2">
-                      {previewData.headers.map((header) => {
-                        const mappedField = previewData.fieldMapping[header];
-                        const displayName = mappedField
-                          ? DISPLAY_COLUMNS.find(c => c.key === mappedField)?.label || mappedField
-                          : '未识别';
-                        return (
-                          <span
-                            key={header}
-                            className={`px-2 py-1 rounded-md text-xs ${
-                              mappedField
-                                ? 'bg-green-100 text-green-800 border border-green-200'
-                                : 'bg-oak-100 text-oak-500 border border-oak-200'
-                            }`}
-                          >
-                            {header} → {displayName}
-                            {mappedField && <Check className="w-3 h-3 inline ml-1" />}
-                          </span>
-                        );
-                      })}
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-3 text-sm">
+                        <span className="text-oak-500">字段映射：</span>
+                        <span className="text-xs text-oak-500">点击下拉框可重新映射CSV列到目标字段</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowFieldMapping(!showFieldMapping)}
+                        className="text-xs text-oak-500 hover:text-oak-700 flex items-center gap-1"
+                      >
+                        {showFieldMapping ? '收起' : '展开'}
+                        <ChevronDown className={`w-3 h-3 transition-transform ${showFieldMapping ? 'rotate-180' : ''}`} />
+                      </button>
                     </div>
+                    {showFieldMapping && (
+                      <div className="bg-parchment-100 border border-oak-200 rounded-lg p-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                          {previewData.headers.map((header) => {
+                            const mappedField = previewData.fieldMapping[header];
+                            const isMapped = mappedField !== null;
+                            const isRequired = ALL_TARGET_FIELDS.find(f => f.key === mappedField)?.required;
+                            return (
+                              <div key={header} className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-medium text-oak-700 truncate max-w-[120px]" title={header}>
+                                    {header}
+                                  </span>
+                                  <span className="text-oak-400 text-xs">→</span>
+                                  {isRequired && <span className="text-rust-600 text-xs">*</span>}
+                                </div>
+                                {renderFieldMappingDropdown(header)}
+                                <div className={`text-[10px] ${isMapped ? 'text-green-600' : 'text-oak-400'}`}>
+                                  当前：{getMappedFieldLabel(header)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-oak-200 flex items-center gap-4 text-xs text-oak-500">
+                          <div className="flex items-center gap-1">
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>鼠标悬停在单元格上可直接编辑内容</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <AlertTriangle className="w-3.5 h-3.5 text-rust-500" />
+                            <span>每次修改后将自动重新校验</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -658,41 +922,14 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                                 <XCircle className="w-5 h-5 text-rust-600" />
                               )}
                             </td>
-                            {DISPLAY_COLUMNS.map((col) => {
-                              const hasError = hasErrorInField(row, col.key);
-                              const fieldErrors = getFieldErrors(row, col.key);
-                              return (
-                                <td
-                                  key={col.key}
-                                  className={`px-3 py-3 relative ${
-                                    hasError ? 'text-rust-700' : 'text-oak-800'
-                                  }`}
-                                >
-                                  <div className="flex items-center gap-1">
-                                    {hasError && (
-                                      <div className="group relative">
-                                        <AlertTriangle className="w-4 h-4 text-rust-600 flex-shrink-0" />
-                                        <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block z-20">
-                                          <div className="bg-rust-900 text-white text-xs rounded-md px-2 py-1 whitespace-nowrap shadow-lg">
-                                            {fieldErrors.map((err, idx) => (
-                                              <div key={idx} className="flex items-center gap-1">
-                                                {getErrorIcon(row.errors.find(e => e.message === err)?.type || '')}
-                                                {err}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-                                    <span className={hasError ? 'font-medium' : ''}>
-                                      {getFieldDisplayValue(row, col.key) || (
-                                        <span className="text-oak-300">—</span>
-                                      )}
-                                    </span>
-                                  </div>
-                                </td>
-                              );
-                            })}
+                            {DISPLAY_COLUMNS.map((col) => (
+                              <td
+                                key={col.key}
+                                className="px-3 py-3"
+                              >
+                                {renderEditableCell(row, col.key)}
+                              </td>
+                            ))}
                           </tr>
                         ))}
                         {displayedRows.length === 0 && (
@@ -720,7 +957,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                             发现 {previewData.invalidCount} 条存在问题的记录
                           </h4>
                           <p className="text-sm text-rust-700 mb-2">
-                            以下类型的问题将导致记录无法导入：
+                            您可以直接点击单元格编辑修正，或修改字段映射。以下类型的问题将导致记录无法导入：
                           </p>
                           <ul className="text-sm text-rust-600 space-y-1">
                             <li className="flex items-center gap-2">
@@ -746,7 +983,7 @@ export function ImportPreviewModal({ isOpen, onClose, specimens, boxes, batches,
                           </ul>
                           <p className="text-sm text-rust-700 mt-3">
                             只有 <span className="font-semibold">有效记录（{previewData.validCount} 条）</span> 将被导入系统。
-                            请修正问题后重新上传，或直接确认导入有效数据。
+                            请修正问题后确认导入，或直接确认导入有效数据。
                           </p>
                         </div>
                       </div>
