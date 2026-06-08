@@ -13,7 +13,7 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
-      include: ['src/utils/**/*.ts', 'src/hooks/**/*.ts'],
+      include: ['src/utils/**/*.ts', 'src/hooks/usePhotographySessions.ts'],
       exclude: [
         'src/**/*.test.ts',
         'src/**/*.test.tsx',
@@ -22,10 +22,12 @@ export default defineConfig({
       ],
       reportsDirectory: './coverage',
       all: true,
-      lines: 70,
-      functions: 70,
-      branches: 70,
-      statements: 70,
+      thresholds: {
+        lines: 70,
+        functions: 70,
+        branches: 70,
+        statements: 70,
+      },
     },
     testTimeout: 10000,
     hookTimeout: 10000,

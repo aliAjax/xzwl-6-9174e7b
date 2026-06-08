@@ -187,13 +187,23 @@ npm run test:common
 
 ### 拍摄会话功能
 
-拍摄会话的核心逻辑在 Hook 中实现，相关测试可以通过单元测试覆盖工具函数，通过 E2E 测试覆盖完整流程。
+```bash
+npm run test:photography
+```
 
 **相关文件：**
 - Hook 实现：[src/hooks/usePhotographySessions.ts](file:///Users/zhuanzmima0000/Desktop/label%20project/Solo%20coder%200601/xzwl-6/src/hooks/usePhotographySessions.ts)
+- 测试：[src/hooks/usePhotographySessions.test.tsx](file:///Users/zhuanzmima0000/Desktop/label%20project/Solo%20coder%200601/xzwl-6/src/hooks/usePhotographySessions.test.tsx)
+
+**覆盖场景：**
+- 按展盒、批次和高风险合规状态筛选未拍摄标本
+- 创建会话并计算目标标本
+- 随标本拍摄状态刷新进度
+- 完成会话并批量标记未拍摄标本
+- 导出拍摄清单 CSV
 
 **修改时建议检查：**
-1. 运行 `npm run test:common` 确保底层工具函数正常
+1. 运行 `npm run test:photography` 确保拍摄会话核心流程正常
 2. 运行 `npm run verify` 确保类型和构建正确
 3. 手动验证：创建会话、添加目标、更新进度、导出清单
 
