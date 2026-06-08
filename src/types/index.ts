@@ -304,6 +304,7 @@ export interface DiffItem {
   specimenNo?: string;
   selectedStrategy: MergeStrategy;
   manualMergedData?: Box | Specimen | CollectionBatch | null;
+  referenceRepair?: ReferenceRepairInfo;
 }
 
 export interface DiffAnalysisResult {
@@ -341,6 +342,17 @@ export interface MergeResult {
     specimens: Specimen[];
     batches: CollectionBatch[];
   };
+}
+
+export type ReferenceRepairAction = 'skip' | 'clear_ref' | 'create_new' | 'choose_existing';
+
+export interface ReferenceRepairInfo {
+  referenceType: 'box' | 'batch';
+  missingId: string;
+  backupName?: string;
+  selectedAction: ReferenceRepairAction;
+  selectedExistingId?: string;
+  newObjectName?: string;
 }
 
 export interface MergeSnapshot {

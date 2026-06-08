@@ -1386,10 +1386,27 @@ const getDefaultStrategy = (conflictType: DiffConflictType): MergeStrategy => {
       return 'keep_current';
     case 'missing_box_ref':
     case 'missing_batch_ref':
-      return 'keep_current';
+      return 'keep_import';
     default:
       return 'keep_current';
   }
+};
+
+const createReferenceRepair = (
+  referenceType: 'box' | 'batch',
+  missingId: string,
+  backupData: BackupFileData
+): DiffItem['referenceRepair'] => {
+  const backupName = referenceType === 'box'
+    ? backupData.data.boxes.find(b => b.id === missingId)?.name
+    : backupData.data.batches.find(b => b.id === missingId)?.name;
+
+  return {
+    referenceType,
+    missingId,
+    backupName,
+    selectedAction: 'skip',
+  };
 };
 
 export const analyzeDifferences = (
@@ -1559,6 +1576,7 @@ export const analyzeDifferences = (
             displayName: getDisplayName(migratedBackup, 'specimen'),
             specimenNo: migratedBackup.specimenNo,
             selectedStrategy: getDefaultStrategy('missing_box_ref'),
+            referenceRepair: createReferenceRepair('box', migratedBackup.boxId!, backupData),
           });
         } else if (missingBatch) {
           items.push({
@@ -1570,6 +1588,7 @@ export const analyzeDifferences = (
             displayName: getDisplayName(migratedBackup, 'specimen'),
             specimenNo: migratedBackup.specimenNo,
             selectedStrategy: getDefaultStrategy('missing_batch_ref'),
+            referenceRepair: createReferenceRepair('batch', migratedBackup.batchId!, backupData),
           });
         } else {
           items.push({
@@ -1608,6 +1627,7 @@ export const analyzeDifferences = (
           displayName: getDisplayName(current, 'specimen'),
           specimenNo: current.specimenNo,
           selectedStrategy: 'keep_current',
+          referenceRepair: createReferenceRepair('box', migratedBackup.boxId!, backupData),
         });
       } else if (missingBatch) {
         items.push({
@@ -1620,6 +1640,7 @@ export const analyzeDifferences = (
           displayName: getDisplayName(current, 'specimen'),
           specimenNo: current.specimenNo,
           selectedStrategy: 'keep_current',
+          referenceRepair: createReferenceRepair('batch', migratedBackup.batchId!, backupData),
         });
       } else if (fieldDiffs.length > 0) {
         items.push({
@@ -1696,6 +1717,70 @@ const applyIdRemappingToSpecimen = (
   };
 };
 
+const applyReferenceRepair = (
+  specimen: Specimen,
+  repairInfo: DiffItem['referenceRepair'],
+  mergedBoxes: Box[],
+  mergedBatches: CollectionBatch[],
+  boxIdMap: Record<string, string>,
+  batchIdMap: Record<string, string>,
+  resultStats: MergeResult['stats']
+): { specimen: Specimen; skip: boolean } => {
+  if (!repairInfo) {
+    return { specimen, skip: false };
+  }
+
+  const result = { ...specimen };
+  const action = repairInfo.selectedAction;
+
+  if (action === 'skip') {
+    return { specimen: result, skip: true };
+  }
+
+  if (action === 'clear_ref') {
+    if (repairInfo.referenceType === 'box') {
+      result.boxId = '';
+    } else {
+      result.batchId = '';
+    }
+  } else if (action === 'create_new') {
+    const newId = generateId();
+    if (repairInfo.referenceType === 'box') {
+      const newBox: Box = {
+        id: newId,
+        name: repairInfo.newObjectName || `修复: ${repairInfo.backupName || '未知展盒'}`,
+        location: '',
+        notes: '由差异合并自动创建，用于修复引用',
+        createdAt: new Date().toISOString(),
+      };
+      mergedBoxes.push(newBox);
+      resultStats.boxesAdded++;
+      result.boxId = newId;
+    } else {
+      const newBatch: CollectionBatch = {
+        id: newId,
+        name: repairInfo.newObjectName || `修复: ${repairInfo.backupName || '未知批次'}`,
+        collectionDate: '',
+        location: '',
+        participants: '',
+        notes: '由差异合并自动创建，用于修复引用',
+        createdAt: new Date().toISOString(),
+      };
+      mergedBatches.push(newBatch);
+      resultStats.batchesAdded++;
+      result.batchId = newId;
+    }
+  } else if (action === 'choose_existing' && repairInfo.selectedExistingId) {
+    if (repairInfo.referenceType === 'box') {
+      result.boxId = repairInfo.selectedExistingId;
+    } else {
+      result.batchId = repairInfo.selectedExistingId;
+    }
+  }
+
+  return { specimen: result, skip: false };
+};
+
 export const performDiffMerge = (
   diffItems: DiffItem[],
   currentBoxes: Box[],
@@ -1754,13 +1839,6 @@ export const performDiffMerge = (
             resultStats.boxesUpdated++;
           }
         }
-      } else if (strategy === 'keep_current' && item.conflictType === 'deleted_in_backup') {
-      } else if (strategy === 'keep_current' && item.currentData) {
-        const idx = mergedBoxes.findIndex(b => b.id === item.id);
-        if (idx >= 0 && item.manualMergedData) {
-          mergedBoxes[idx] = item.manualMergedData as Box;
-          resultStats.boxesUpdated++;
-        }
       } else if (strategy === 'manual' && item.manualMergedData) {
         const idx = mergedBoxes.findIndex(b => b.id === item.id);
         if (idx >= 0) {
@@ -1786,13 +1864,6 @@ export const performDiffMerge = (
             resultStats.batchesUpdated++;
           }
         }
-      } else if (strategy === 'keep_current' && item.conflictType === 'deleted_in_backup') {
-      } else if (strategy === 'keep_current' && item.currentData) {
-        const idx = mergedBatches.findIndex(b => b.id === item.id);
-        if (idx >= 0 && item.manualMergedData) {
-          mergedBatches[idx] = item.manualMergedData as CollectionBatch;
-          resultStats.batchesUpdated++;
-        }
       } else if (strategy === 'manual' && item.manualMergedData) {
         const idx = mergedBatches.findIndex(b => b.id === item.id);
         if (idx >= 0) {
@@ -1808,11 +1879,28 @@ export const performDiffMerge = (
         const backupSpecimen = migrateSpecimenWithCompliance(item.backupData as Partial<Specimen>);
         const newId = specimenIdMap[backupSpecimen.id] || backupSpecimen.id;
         
-        if (item.conflictType === 'new_in_backup' || item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') {
-          if (item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') {
+        if (item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') {
+          const repairResult = applyReferenceRepair(
+            { ...backupSpecimen, id: newId },
+            item.referenceRepair,
+            mergedBoxes,
+            mergedBatches,
+            boxIdMap,
+            batchIdMap,
+            resultStats
+          );
+          if (repairResult.skip) {
             resultStats.skipped++;
             return;
           }
+          const remappedSpecimen = applyIdRemappingToSpecimen(
+            repairResult.specimen,
+            boxIdMap,
+            batchIdMap
+          );
+          mergedSpecimens.push(remappedSpecimen);
+          resultStats.specimensAdded++;
+        } else if (item.conflictType === 'new_in_backup') {
           const remappedSpecimen = applyIdRemappingToSpecimen(
             { ...backupSpecimen, id: newId },
             boxIdMap,
@@ -1832,8 +1920,6 @@ export const performDiffMerge = (
             resultStats.specimensUpdated++;
           }
         }
-      } else if (strategy === 'keep_current' && item.conflictType === 'deleted_in_backup') {
-      } else if (strategy === 'keep_current' && item.currentData) {
       } else if (strategy === 'manual' && item.manualMergedData) {
         const idx = mergedSpecimens.findIndex(s => s.id === item.id);
         const manualData = item.manualMergedData as Specimen;
@@ -1850,11 +1936,34 @@ export const performDiffMerge = (
           );
           mergedSpecimens.push(remappedSpecimen);
           resultStats.specimensAdded++;
+        } else if (item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') {
+          const repairResult = applyReferenceRepair(
+            manualData,
+            item.referenceRepair,
+            mergedBoxes,
+            mergedBatches,
+            boxIdMap,
+            batchIdMap,
+            resultStats
+          );
+          if (repairResult.skip) {
+            resultStats.skipped++;
+            return;
+          }
+          const newId = generateId();
+          const remappedSpecimen = applyIdRemappingToSpecimen(
+            { ...repairResult.specimen, id: newId },
+            boxIdMap,
+            batchIdMap
+          );
+          mergedSpecimens.push(remappedSpecimen);
+          resultStats.specimensAdded++;
         }
       } else if (item.conflictType === 'deleted_in_backup' && strategy === 'keep_import') {
         mergedSpecimens = mergedSpecimens.filter(s => s.id !== item.id);
         resultStats.specimensDeleted++;
-      } else if (item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') {
+      } else if ((item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') 
+                 && item.referenceRepair?.selectedAction === 'skip') {
         resultStats.skipped++;
       }
     }

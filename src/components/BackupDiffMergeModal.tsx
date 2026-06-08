@@ -1,19 +1,19 @@
 import { useState, useCallback, useMemo } from 'react';
 import {
   X, Upload, Database, AlertTriangle, CheckCircle, ArrowLeft,
-  Check, GitMerge, Trash2, RotateCcw, ChevronDown, ChevronRight,
-  Edit3, Save, Filter
+  GitMerge, RotateCcw, ChevronDown, ChevronRight,
+  Edit3, Save, Filter, Plus, Link2Off
 } from 'lucide-react';
 import type {
   Box, Specimen, CollectionBatch, BackupFileData,
   DiffAnalysisResult, DiffItem, DiffConflictType, MergeStrategy,
-  MergeResult, FieldDiff, DiffItemType
+  MergeResult, DiffItemType, ReferenceRepairAction
 } from '../types';
 import { COMPLIANCE_STATUS_OPTIONS } from '../types';
 import {
   readFileAsText, parseBackupFile, checkCompatibility, analyzeDifferences,
   performDiffMerge, restoreFromSnapshot, getConflictTypeLabel,
-  getConflictTypeColor, getStrategyLabel, getTypeLabel
+  getConflictTypeColor, getTypeLabel
 } from '../utils/helpers';
 
 interface BackupDiffMergeModalProps {
@@ -182,11 +182,89 @@ export function BackupDiffMergeModal({
     }
   };
 
+  const updateReferenceRepair = (itemId: string, action: ReferenceRepairAction) => {
+    setDiffItems(prev =>
+      prev.map(item =>
+        item.id === itemId && item.referenceRepair
+          ? {
+              ...item,
+              referenceRepair: {
+                ...item.referenceRepair,
+                selectedAction: action,
+                selectedExistingId: undefined,
+                newObjectName: item.referenceRepair.backupName,
+              },
+            }
+          : item
+      )
+    );
+  };
+
+  const updateRepairExistingId = (itemId: string, existingId: string) => {
+    setDiffItems(prev =>
+      prev.map(item =>
+        item.id === itemId && item.referenceRepair
+          ? {
+              ...item,
+              referenceRepair: {
+                ...item.referenceRepair,
+                selectedExistingId: existingId,
+              },
+            }
+          : item
+      )
+    );
+  };
+
+  const updateRepairNewName = (itemId: string, newName: string) => {
+    setDiffItems(prev =>
+      prev.map(item =>
+        item.id === itemId && item.referenceRepair
+          ? {
+              ...item,
+              referenceRepair: {
+                ...item.referenceRepair,
+                newObjectName: newName,
+              },
+            }
+          : item
+      )
+    );
+  };
+
+  const getRepairActionLabel = (action: ReferenceRepairAction): string => {
+    const labels: Record<ReferenceRepairAction, string> = {
+      skip: '跳过此记录',
+      clear_ref: '清空引用字段',
+      create_new: '新建关联对象',
+      choose_existing: '选择现有对象',
+    };
+    return labels[action];
+  };
+
   const bulkUpdateStrategy = (conflictType: DiffConflictType, strategy: MergeStrategy) => {
     setDiffItems(prev =>
       prev.map(item =>
         item.conflictType === conflictType
           ? { ...item, selectedStrategy: strategy, manualMergedData: null }
+          : item
+      )
+    );
+  };
+
+  const bulkRepairReferences = (conflictType: DiffConflictType, action: ReferenceRepairAction) => {
+    setDiffItems(prev =>
+      prev.map(item =>
+        item.conflictType === conflictType && item.referenceRepair
+          ? {
+              ...item,
+              referenceRepair: {
+                ...item.referenceRepair,
+                selectedAction: action,
+                selectedExistingId: undefined,
+                newObjectName: item.referenceRepair.backupName,
+              },
+            }
           : item
       )
     );
@@ -224,7 +302,28 @@ export function BackupDiffMergeModal({
     setManualEditData({});
   };
 
+  const validateMerge = (): string | null => {
+    for (const item of diffItems) {
+      if (!item.referenceRepair) continue;
+      
+      const repair = item.referenceRepair;
+      if (repair.selectedAction === 'choose_existing' && !repair.selectedExistingId) {
+        return `标本「${item.displayName}」的${repair.referenceType === 'box' ? '展盒' : '批次'}引用修复未完成：请选择一个现有${repair.referenceType === 'box' ? '展盒' : '批次'}。`;
+      }
+      if (repair.selectedAction === 'create_new' && !repair.newObjectName?.trim()) {
+        return `标本「${item.displayName}」的${repair.referenceType === 'box' ? '展盒' : '批次'}引用修复未完成：请输入新建${repair.referenceType === 'box' ? '展盒' : '批次'}的名称。`;
+      }
+    }
+    return null;
+  };
+
   const handleMerge = () => {
+    const validationError = validateMerge();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setIsProcessing(true);
     setError('');
 
@@ -354,96 +453,139 @@ export function BackupDiffMergeModal({
     );
   };
 
+  const renderFieldEditor = (field: string, value: unknown) => {
+    const fieldValue = manualEditData[field] ?? value;
+    
+    if (field === 'complianceStatus') {
+      return (
+        <select
+          value={String(fieldValue ?? '')}
+          onChange={(e) => updateManualField(field, e.target.value)}
+          className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
+        >
+          {COMPLIANCE_STATUS_OPTIONS.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
+      );
+    }
+    if (field === 'boxId') {
+      return (
+        <select
+          value={String(fieldValue ?? '')}
+          onChange={(e) => updateManualField(field, e.target.value)}
+          className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
+        >
+          <option value="">(空)</option>
+          {boxes.map(b => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+          {backupData?.data.boxes.filter(b => !boxes.find(cb => cb.id === b.id)).map(b => (
+            <option key={b.id} value={b.id}>{b.name} (备份)</option>
+          ))}
+        </select>
+      );
+    }
+    if (field === 'batchId') {
+      return (
+        <select
+          value={String(fieldValue ?? '')}
+          onChange={(e) => updateManualField(field, e.target.value)}
+          className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
+        >
+          <option value="">(空)</option>
+          {batches.map(b => (
+            <option key={b.id} value={b.id}>{b.name}</option>
+          ))}
+          {backupData?.data.batches.filter(b => !batches.find(cb => cb.id === b.id)).map(b => (
+            <option key={b.id} value={b.id}>{b.name} (备份)</option>
+          ))}
+        </select>
+      );
+    }
+    if (typeof fieldValue === 'boolean') {
+      return (
+        <select
+          value={String(fieldValue ?? false)}
+          onChange={(e) => updateManualField(field, e.target.value === 'true')}
+          className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
+        >
+          <option value="true">是</option>
+          <option value="false">否</option>
+        </select>
+      );
+    }
+    return (
+      <input
+        type="text"
+        value={String(fieldValue ?? '')}
+        onChange={(e) => updateManualField(field, e.target.value)}
+        className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
+      />
+    );
+  };
+
   const renderManualEditor = (item: DiffItem) => {
     if (editingItemId !== item.id) return null;
-    if (!item.fieldDiffs || item.fieldDiffs.length === 0) return null;
+
+    const baseData = item.currentData || item.backupData;
+    if (!baseData) return null;
+
+    let editableFields: string[] = [];
+    if (item.type === 'box') {
+      editableFields = ['name', 'location', 'notes'];
+    } else if (item.type === 'batch') {
+      editableFields = ['name', 'collectionDate', 'location', 'participants', 'notes'];
+    } else {
+      editableFields = [
+        'specimenNo', 'species', 'collectionLocation', 'collectionDate',
+        'pinnedStatus', 'boxId', 'batchId', 'photographed', 'notes',
+        'complianceStatus', 'permitNumber', 'permitExpiryDate', 'complianceNotes'
+      ];
+    }
+
+    const isNewRecord = !item.currentData;
 
     return (
       <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
         <div className="text-sm font-medium text-amber-800 mb-3 flex items-center gap-2">
           <Edit3 className="w-4 h-4" />
-          手动合并编辑
+          {isNewRecord ? '编辑新记录' : '手动合并编辑'}
         </div>
-        <div className="space-y-3">
-          {item.fieldDiffs.map((diff, idx) => (
-            <div key={idx}>
-              <label className="block text-sm font-medium text-oak-700 mb-1">
-                {FIELD_LABELS[diff.field] || diff.field}
-              </label>
-              {diff.field === 'complianceStatus' ? (
-                <select
-                  value={String(manualEditData[diff.field] ?? '')}
-                  onChange={(e) => updateManualField(diff.field, e.target.value)}
-                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
-                >
-                  {COMPLIANCE_STATUS_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              ) : diff.field === 'boxId' ? (
-                <select
-                  value={String(manualEditData[diff.field] ?? '')}
-                  onChange={(e) => updateManualField(diff.field, e.target.value)}
-                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
-                >
-                  <option value="">(空)</option>
-                  {boxes.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                  {backupData?.data.boxes.filter(b => !boxes.find(cb => cb.id === b.id)).map(b => (
-                    <option key={b.id} value={b.id}>{b.name} (备份)</option>
-                  ))}
-                </select>
-              ) : diff.field === 'batchId' ? (
-                <select
-                  value={String(manualEditData[diff.field] ?? '')}
-                  onChange={(e) => updateManualField(diff.field, e.target.value)}
-                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
-                >
-                  <option value="">(空)</option>
-                  {batches.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                  {backupData?.data.batches.filter(b => !batches.find(cb => cb.id === b.id)).map(b => (
-                    <option key={b.id} value={b.id}>{b.name} (备份)</option>
-                  ))}
-                </select>
-              ) : typeof diff.currentValue === 'boolean' || typeof diff.backupValue === 'boolean' ? (
-                <select
-                  value={String(manualEditData[diff.field] ?? false)}
-                  onChange={(e) => updateManualField(diff.field, e.target.value === 'true')}
-                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
-                >
-                  <option value="true">是</option>
-                  <option value="false">否</option>
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={String(manualEditData[diff.field] ?? '')}
-                  onChange={(e) => updateManualField(diff.field, e.target.value)}
-                  className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-rust-500 focus:border-rust-500"
-                />
-              )}
-              <div className="flex gap-2 mt-2 text-xs text-oak-500">
-                <button
-                  type="button"
-                  onClick={() => updateManualField(diff.field, diff.currentValue)}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  使用当前值
-                </button>
-                <span>|</span>
-                <button
-                  type="button"
-                  onClick={() => updateManualField(diff.field, diff.backupValue)}
-                  className="text-green-600 hover:text-green-800"
-                >
-                  使用导入值
-                </button>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {editableFields.map((field) => {
+            const fieldDiff = item.fieldDiffs?.find(d => d.field === field);
+            const hasConflict = !!fieldDiff;
+            
+            return (
+              <div key={field} className={hasConflict ? 'md:col-span-2' : ''}>
+                <label className="block text-sm font-medium text-oak-700 mb-1">
+                  {FIELD_LABELS[field] || field}
+                  {hasConflict && <span className="text-xs text-amber-600 ml-2">(存在差异)</span>}
+                </label>
+                {renderFieldEditor(field, (baseData as unknown as Record<string, unknown>)[field])}
+                {hasConflict && (
+                  <div className="flex gap-2 mt-2 text-xs text-oak-500">
+                    <button
+                      type="button"
+                      onClick={() => updateManualField(field, fieldDiff!.currentValue)}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      使用当前值: {formatValue(fieldDiff!.currentValue, field)}
+                    </button>
+                    <span>|</span>
+                    <button
+                      type="button"
+                      onClick={() => updateManualField(field, fieldDiff!.backupValue)}
+                      className="text-green-600 hover:text-green-800"
+                    >
+                      使用导入值: {formatValue(fieldDiff!.backupValue, field)}
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <div className="flex gap-2 mt-4">
           <button
@@ -452,7 +594,7 @@ export function BackupDiffMergeModal({
             className="btn-primary text-sm px-4 py-2 flex items-center gap-2"
           >
             <Save className="w-4 h-4" />
-            保存手动合并
+            保存
           </button>
           <button
             type="button"
@@ -461,6 +603,107 @@ export function BackupDiffMergeModal({
           >
             取消
           </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderReferenceRepair = (item: DiffItem) => {
+    if (!item.referenceRepair) return null;
+
+    const repair = item.referenceRepair;
+    const availableOptions = repair.referenceType === 'box' 
+      ? boxes 
+      : batches;
+
+    return (
+      <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-4">
+        <div className="text-sm font-medium text-purple-800 mb-3 flex items-center gap-2">
+          <Link2Off className="w-4 h-4" />
+          {repair.referenceType === 'box' ? '展盒引用丢失' : '批次引用丢失'}修复选项
+        </div>
+        
+        {repair.backupName && (
+          <p className="text-sm text-purple-700 mb-3">
+            原引用{repair.referenceType === 'box' ? '展盒' : '批次'}名称：
+            <strong className="ml-1">{repair.backupName}</strong>
+          </p>
+        )}
+
+        <div className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            {(['skip', 'clear_ref', 'create_new', 'choose_existing'] as ReferenceRepairAction[]).map(action => (
+              <button
+                key={action}
+                type="button"
+                onClick={() => updateReferenceRepair(item.id, action)}
+                className={`text-xs px-3 py-1.5 rounded-md border transition-colors ${
+                  repair.selectedAction === action
+                    ? 'bg-purple-600 text-white border-purple-600'
+                    : 'bg-white text-purple-700 border-purple-300 hover:bg-purple-100'
+                }`}
+              >
+                {getRepairActionLabel(action)}
+              </button>
+            ))}
+          </div>
+
+          {repair.selectedAction === 'choose_existing' && (
+            <div className="pt-2">
+              <label className="block text-sm font-medium text-oak-700 mb-1">
+                选择现有{repair.referenceType === 'box' ? '展盒' : '批次'}：
+              </label>
+              <select
+                value={repair.selectedExistingId || ''}
+                onChange={(e) => updateRepairExistingId(item.id, e.target.value)}
+                className="w-full px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+              >
+                <option value="">请选择...</option>
+                {availableOptions.map(opt => (
+                  <option key={opt.id} value={opt.id}>{opt.name}</option>
+                ))}
+              </select>
+              {!repair.selectedExistingId && (
+                <p className="text-xs text-rust-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  请选择一个现有{repair.referenceType === 'box' ? '展盒' : '批次'}
+                </p>
+              )}
+            </div>
+          )}
+
+          {repair.selectedAction === 'create_new' && (
+            <div className="pt-2">
+              <label className="block text-sm font-medium text-oak-700 mb-1">
+                新建{repair.referenceType === 'box' ? '展盒' : '批次'}名称：
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={repair.newObjectName || repair.backupName || ''}
+                  onChange={(e) => updateRepairNewName(item.id, e.target.value)}
+                  placeholder={`输入新${repair.referenceType === 'box' ? '展盒' : '批次'}名称`}
+                  className="flex-1 px-3 py-2 border border-oak-300 rounded-md text-sm focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                />
+                <div className="flex items-center gap-1 text-xs text-oak-500">
+                  <Plus className="w-3 h-3" />
+                  将自动创建
+                </div>
+              </div>
+            </div>
+          )}
+
+          {repair.selectedAction === 'clear_ref' && (
+            <p className="text-sm text-oak-600 pt-1">
+              将清空该标本的{repair.referenceType === 'box' ? '展盒' : '批次'}引用字段。
+            </p>
+          )}
+
+          {repair.selectedAction === 'skip' && (
+            <p className="text-sm text-oak-600 pt-1">
+              这条记录将被跳过，不会导入到系统中。
+            </p>
+          )}
         </div>
       </div>
     );
@@ -516,8 +759,12 @@ export function BackupDiffMergeModal({
               >
                 <option value="keep_current">保留当前</option>
                 <option value="keep_import">使用导入</option>
-                {(item.conflictType === 'field_inconsistent' || item.conflictType === 'specimen_no_conflict') && (
-                  <option value="manual">手动合并</option>
+                {(item.conflictType === 'field_inconsistent' || 
+                  item.conflictType === 'specimen_no_conflict' ||
+                  item.conflictType === 'new_in_backup' ||
+                  item.conflictType === 'missing_box_ref' ||
+                  item.conflictType === 'missing_batch_ref') && (
+                  <option value="manual">手动编辑</option>
                 )}
               </select>
             </div>
@@ -546,28 +793,18 @@ export function BackupDiffMergeModal({
               </div>
             )}
 
-            {(item.conflictType === 'missing_box_ref' || item.conflictType === 'missing_batch_ref') && (
-              <div className="mt-3 bg-purple-50 border border-purple-200 rounded-lg p-3">
-                <div className="text-sm font-medium text-purple-800 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  引用警告
-                </div>
-                <p className="text-sm text-purple-700 mt-1">
-                  {item.conflictType === 'missing_box_ref'
-                    ? '该标本引用的展盒在备份和当前系统中都不存在。选择"使用导入"将跳过此记录。'
-                    : '该标本引用的采集批次在备份和当前系统中都不存在。选择"使用导入"将跳过此记录。'}
-                </p>
-              </div>
-            )}
+            {renderReferenceRepair(item)}
 
             {renderManualEditor(item)}
 
-            {(item.conflictType === 'field_inconsistent' || item.conflictType === 'specimen_no_conflict') && (
+            {(item.conflictType === 'field_inconsistent' || 
+              item.conflictType === 'specimen_no_conflict' ||
+              item.conflictType === 'new_in_backup') && (
               <div className="mt-3">
                 {item.selectedStrategy === 'manual' && editingItemId !== item.id && (
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-amber-700 bg-amber-50 px-2 py-1 rounded">
-                      已保存手动合并结果
+                      已保存手动编辑结果
                     </span>
                     <button
                       type="button"
@@ -585,9 +822,22 @@ export function BackupDiffMergeModal({
                     className="text-sm text-oak-600 hover:text-oak-800 flex items-center gap-1"
                   >
                     <Edit3 className="w-3 h-3" />
-                    手动合并字段
+                    {item.conflictType === 'new_in_backup' ? '编辑导入内容' : '手动合并字段'}
                   </button>
                 )}
+              </div>
+            )}
+
+            {item.referenceRepair && item.selectedStrategy === 'manual' && editingItemId !== item.id && !item.manualMergedData && (
+              <div className="mt-3">
+                <button
+                  type="button"
+                  onClick={() => startManualEdit(item)}
+                  className="text-sm text-oak-600 hover:text-oak-800 flex items-center gap-1"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  编辑导入内容
+                </button>
               </div>
             )}
           </div>
@@ -601,9 +851,11 @@ export function BackupDiffMergeModal({
 
     const conflictColor = getConflictTypeColor(conflictType);
 
+    const isReferenceConflict = conflictType === 'missing_box_ref' || conflictType === 'missing_batch_ref';
+
     return (
       <div key={conflictType} className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <div className="flex items-center gap-2">
             <span className={`text-sm px-3 py-1 rounded-full border font-medium ${conflictColor}`}>
               {getConflictTypeLabel(conflictType)}
@@ -612,16 +864,30 @@ export function BackupDiffMergeModal({
               {items.length} 条
             </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-oak-500">批量选择：</span>
-            <button
-              type="button"
-              onClick={() => bulkUpdateStrategy(conflictType, 'keep_current')}
-              className="text-xs px-2 py-1 bg-oak-100 hover:bg-oak-200 text-oak-700 rounded transition-colors"
-            >
-              全部保留当前
-            </button>
-            {conflictType !== 'missing_box_ref' && conflictType !== 'missing_batch_ref' && (
+          {isReferenceConflict ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs text-oak-500">批量修复：</span>
+              {(['skip', 'clear_ref', 'create_new', 'choose_existing'] as ReferenceRepairAction[]).map(action => (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() => bulkRepairReferences(conflictType, action)}
+                  className="text-xs px-2 py-1 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded transition-colors"
+                >
+                  {getRepairActionLabel(action)}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-oak-500">批量选择：</span>
+              <button
+                type="button"
+                onClick={() => bulkUpdateStrategy(conflictType, 'keep_current')}
+                className="text-xs px-2 py-1 bg-oak-100 hover:bg-oak-200 text-oak-700 rounded transition-colors"
+              >
+                全部保留当前
+              </button>
               <button
                 type="button"
                 onClick={() => bulkUpdateStrategy(conflictType, 'keep_import')}
@@ -629,8 +895,8 @@ export function BackupDiffMergeModal({
               >
                 全部使用导入
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
         <div className="space-y-2">
           {items.map(item => renderDiffItem(item))}
